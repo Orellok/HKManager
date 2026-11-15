@@ -16,10 +16,12 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.2 Supabase local + RLS | criteria approved – in implementation | docs/specs/m0-2-supabase-local.md |
+| M0.2 Supabase local + RLS | in implementation – WIP commit fb275b9 (draft migration/seed/config, unverified) | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-Run senior-developer on M0.2, then review, then QA.
+Finish M0.2 implementation (senior-developer), then review, then QA.
+Sandbox note: proxy blocks public.ecr.aws/ghcr.io blobs; run Supabase CLI with SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io in the cloud sandbox only (lead decision, not baked into scripts).
+M0.3 items: revisit enable_signup=false vs Google OAuth first sign-in; confirm trusting JWT email claim without verification check.
 Before M0.3/M0.4: lead prepares step-by-step Supabase account + staging/production project setup instructions for the owner (owner has no setup yet).
 Environment: Docker daemon is not running by default in the cloud container – start it with `nohup dockerd >/tmp/dockerd.log 2>&1 &` before `supabase start`.
 QA note for M0.3: default focus outline (outline-ring/50) is too light (<3:1) – fix when the first focusable element (login button) is added.

@@ -17,7 +17,7 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.3 Auth | criteria approved – in implementation | docs/specs/m0-3-auth.md |
+| M0.3 Auth | in implementation – WIP (auth hook prototype, unverified); dev agent hit usage limit 2026-11-15 | docs/specs/m0-3-auth.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step

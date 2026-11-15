@@ -33,20 +33,41 @@ api_url = "http://127.0.0.1"
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["http://localhost:3000"]
+# The OAuth callback route (src/app/auth/callback/route.ts) on both local hostnames.
+additional_redirect_urls = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000/auth/callback",
+  "http://localhost:3000/auth/callback",
+]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
-# No self sign-up (SPEC section 2). Local test users are created through the admin API.
-# Must be revisited in M0.3: with sign-up disabled, GoTrue also rejects a Google OAuth user's
-# first sign-in.
-enable_signup = false
+# Sign-up must be on: with it off, Supabase Auth also rejects the first Google sign-in of an
+# allowlisted user. Who may be created is decided by the before-user-created hook below, which
+# accepts only Google accounts on the allowlist, so self sign-up stays closed (SPEC section 2)
+# and email/password sign-up is rejected for every address. Local test users are created
+# through the admin API, which does not pass through the hook.
+enable_signup = true
 enable_anonymous_sign_ins = false
 
 # Email/password is enabled locally only so the integration tests can sign in test users.
 [auth.email]
 enabled = true
 enable_confirmations = false
+
+# AUTH-2 (owner decision option A): reject every new user that is not an allowlisted Google
+# account. The function is created by a migration in supabase/migrations/.
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/hook_before_user_created"
+
+# AUTH-1: Google Sign-In. Credentials come from the environment (never commit them); see
+# .env.example and docs/setup/google-auth.md. Without them the stack still starts and only the
+# Google button fails, which is enough for the tests: they create sessions without Google.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 
 [realtime]
 enabled = false

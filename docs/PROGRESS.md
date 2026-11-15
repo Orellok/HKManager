@@ -17,8 +17,8 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.3 Auth | DONE – review APPROVED, QA PASS, 2 fix rounds (prefetch auth bypass; hook fail-closed + /login redirect) | |
-| M0.4 CI + migrations workflow | criteria drafted – awaiting owner approval | docs/specs/m0-3-auth.md |
+| M0.3 Auth | DONE – review APPROVED, QA PASS, 2 fix rounds (prefetch auth bypass; hook fail-closed + /login redirect) | docs/specs/m0-3-auth.md |
+| M0.4 CI + migrations workflow | criteria drafted – awaiting owner approval | – |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step

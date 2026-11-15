@@ -95,13 +95,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    {
-      // Static build assets carry no inline code and need no nonce.
-      source: "/((?!_next/static|_next/image|favicon.ico).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
+    // Every request except static build assets, which carry no data or inline code.
+    // Prefetch requests are NOT excluded: their headers are client-controlled, and a
+    // prefetch returns the page's RSC payload, so the auth checks must run for them too.
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

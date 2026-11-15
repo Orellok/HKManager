@@ -56,6 +56,22 @@ test.describe("AUTH-3: protected routes", () => {
     });
   }
 
+  for (const [label, headers] of [
+    ["purpose: prefetch", { purpose: "prefetch" }],
+    ["next-router-prefetch: 1", { "next-router-prefetch": "1" }],
+    ["next-router-prefetch with an RSC request", { "next-router-prefetch": "1", rsc: "1" }],
+  ] as const) {
+    test(`AUTH-3: unauthenticated GET / with ${label} redirects and renders no page data`, async ({
+      request,
+    }) => {
+      const response = await request.get("/", { headers, maxRedirects: 0 });
+
+      expect(response.status()).toBe(307);
+      expect(new URL(response.headers()["location"], "http://x").pathname).toBe("/login");
+      expect(await response.text()).not.toContain("דף הבית");
+    });
+  }
+
   test("AUTH-3: a forged auth cookie is not trusted", async ({ page, context, baseURL }) => {
     const ref = new URL(SUPABASE_ORIGIN).hostname.split(".")[0];
     await context.addCookies([
@@ -166,9 +182,31 @@ test.describe("AUTH-1: Google OAuth", () => {
     expect(authorizeUrl.searchParams.get("prompt")).toBe("select_account");
   });
 
+  test("AUTH-2: the callback shows 'אין הרשאה' when the hook refused the account", async ({
+    page,
+  }) => {
+    // The redirect Supabase Auth (GoTrue v2.197.0) sends when the before-user-created hook
+    // rejects a sign-up.
+    const query = new URLSearchParams({
+      error: "access_denied",
+      error_code: "",
+      error_description: "This account is not allowed to access the app.",
+    });
+
+    await page.goto(`/auth/callback?${query}`);
+
+    await expect(page).toHaveURL(/\/unauthorized$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("אין הרשאה");
+    expect(await authCookieNames(page.context())).toEqual([]);
+  });
+
   for (const [label, query] of [
     ["without a code", ""],
     ["with an OAuth error", "?error=access_denied&error_description=denied"],
+    [
+      "with a hook message but no error",
+      "?error_description=This+account+is+not+allowed+to+access+the+app.",
+    ],
     ["with an invalid code", "?code=not-a-real-code"],
   ]) {
     test(`AUTH-1: the callback ${label} returns to /login with an error`, async ({ page }) => {

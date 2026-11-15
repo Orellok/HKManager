@@ -16,10 +16,11 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.2 Supabase local + RLS | criteria drafted – awaiting owner approval | docs/specs/m0-2-supabase-local.md (after approval) |
+| M0.2 Supabase local + RLS | criteria approved – in implementation | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-Owner to approve M0.2 criteria (drafted in chat 2026-11-15). Then run senior-developer on M0.2.
+Run senior-developer on M0.2, then review, then QA.
+Before M0.3/M0.4: lead prepares step-by-step Supabase account + staging/production project setup instructions for the owner (owner has no setup yet).
 Environment: Docker daemon is not running by default in the cloud container – start it with `nohup dockerd >/tmp/dockerd.log 2>&1 &` before `supabase start`.
 QA note for M0.3: default focus outline (outline-ring/50) is too light (<3:1) – fix when the first focusable element (login button) is added.
 Non-blocking review notes to carry forward: Tailwind runs via @tailwindcss/turbopack (no postcss config) – consider switching to @tailwindcss/postcss before shadcn components are added; production CSP style-src has no unsafe-inline – watch Recharts/Radix inline styles (M4); widen connect-src for Supabase/Sentry in M0.2/M0.5; @types/node ^20 vs Node 22; unused dark variant in globals.css.

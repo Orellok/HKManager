@@ -16,10 +16,11 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.2 Supabase local + RLS | in implementation – WIP commit fb275b9 (draft migration/seed/config, unverified) | docs/specs/m0-2-supabase-local.md |
+| M0.2 Supabase local + RLS | implemented (fb275b9, b6c0ede..1664e41) – in code review | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-Finish M0.2 implementation (senior-developer), then review, then QA.
+Run code-reviewer on M0.2 (diff 5427a34..HEAD), then QA.
+Carry to M0.3: CSP connect-src must include the Supabase URL; @types/node ^20 -> ^22 (Vitest peer warning).
 Sandbox note: proxy blocks public.ecr.aws/ghcr.io blobs; run Supabase CLI with SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io in the cloud sandbox only (lead decision, not baked into scripts).
 M0.3 items: revisit enable_signup=false vs Google OAuth first sign-in; confirm trusting JWT email claim without verification check.
 Before M0.3/M0.4: lead prepares step-by-step Supabase account + staging/production project setup instructions for the owner (owner has no setup yet).

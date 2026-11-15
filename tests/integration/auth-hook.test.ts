@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { HOOK_REJECTION_MESSAGES } from "@/lib/auth/hook-rejection";
+
 import {
   createAnonClient,
   createServiceRoleClient,
@@ -14,8 +16,11 @@ const TABLE = "allowed_users";
 const TEST_DOMAIN_PATTERN = "%@hkmanager.test";
 const INSUFFICIENT_PRIVILEGE = "42501";
 const HOOK_REJECTED_STATUS = 403;
-const NOT_ALLOWED_MESSAGE = "This account is not allowed to access the app.";
-const GOOGLE_ONLY_MESSAGE = "Sign-up is available with Google only.";
+// The callback route maps these exact messages to the "אין הרשאה" screen, so the tests use
+// the app's constants: a drift between SQL and TypeScript fails here.
+const NOT_ALLOWED_MESSAGE = HOOK_REJECTION_MESSAGES.notAllowed;
+const GOOGLE_ONLY_MESSAGE = HOOK_REJECTION_MESSAGES.googleOnly;
+const UNVERIFIED_MESSAGE = HOOK_REJECTION_MESSAGES.emailNotVerified;
 
 type HookResponse = { error?: { http_code: number; message: string } };
 
@@ -137,6 +142,50 @@ describe("before-user-created hook: decision", () => {
     expect(await expectHookResponse(event)).toEqual({
       error: { http_code: HOOK_REJECTED_STATUS, message: GOOGLE_ONLY_MESSAGE },
     });
+  });
+
+  it.each([
+    ["false", false],
+    ["the string 'false'", "false"],
+  ])(
+    "AUTH-2: rejects an allowlisted Google account whose email_verified is %s",
+    async (_case, value) => {
+      const event = userCreatedEvent({
+        email: allowlistedEmail,
+        app_metadata: { provider: "google", providers: ["google"] },
+        user_metadata: { email: allowlistedEmail, email_verified: value },
+      });
+
+      expect(await expectHookResponse(event)).toEqual({
+        error: { http_code: HOOK_REJECTED_STATUS, message: UNVERIFIED_MESSAGE },
+      });
+    },
+  );
+
+  it.each([
+    ["true", { email_verified: true }],
+    ["absent", {}],
+  ])(
+    "AUTH-2: allows an allowlisted Google account whose email_verified is %s",
+    async (_case, userMetadata) => {
+      const event = userCreatedEvent({
+        email: allowlistedEmail,
+        app_metadata: { provider: "google", providers: ["google"] },
+        user_metadata: userMetadata,
+      });
+
+      expect(await expectHookResponse(event)).toEqual({});
+    },
+  );
+
+  it("AUTH-2: an unverified email outside the allowlist is still rejected", async () => {
+    const event = userCreatedEvent({
+      email: testEmail("hook-unverified-outsider"),
+      app_metadata: { provider: "google", providers: ["google"] },
+      user_metadata: { email_verified: false },
+    });
+
+    expect((await expectHookResponse(event)).error?.http_code).toBe(HOOK_REJECTED_STATUS);
   });
 
   it.each([

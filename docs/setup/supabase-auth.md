@@ -29,7 +29,7 @@
 ## בדיקה ידנית אחרי ההגדרה (לכל סביבה)
 1. כניסה עם חשבון Google שב-allowlist → מגיעים ל"דף הבית", ובכותרת מופיע "יציאה".
 2. "יציאה" → חוזרים למסך הכניסה.
-3. כניסה עם חשבון Google שאינו ב-allowlist → חוזרים למסך הכניסה עם ההודעה "הכניסה לא הושלמה…". ב-Authentication → Users לא נוצר משתמש חדש.
+3. כניסה עם חשבון Google שאינו ב-allowlist → מוצג המסך "אין הרשאה". ב-Authentication → Users לא נוצר משתמש חדש.
 
 ## מקומי
 `supabase/config.toml` כבר מגדיר את כל זה. לכניסה אמיתית עם Google מקומית יש להגדיר `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` ו-`SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` (ראו `.env.example`) ולהפעיל מחדש את `pnpm db:start`.

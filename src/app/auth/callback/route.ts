@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { HOME_PATH, LOGIN_PATH, UNAUTHORIZED_PATH } from "@/lib/auth/access";
+import { isHookRejection } from "@/lib/auth/hook-rejection";
 import { SIGN_IN_ERROR_PARAM, SIGN_IN_ERROR_VALUE } from "@/lib/auth/sign-in-error";
 import { fetchIsAllowedUser } from "@/lib/auth/roles";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,7 +20,15 @@ function signInFailed(request: NextRequest): NextResponse {
  * hook rejected an account outside the allowlist.
  */
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
+  const { searchParams } = request.nextUrl;
+
+  // AUTH-2: the hook refused to create this account (it is not on the allowlist). No session
+  // exists. The description only selects which screen to show; it grants nothing.
+  if (searchParams.has("error") && isHookRejection(searchParams.get("error_description"))) {
+    return redirectTo(request, UNAUTHORIZED_PATH);
+  }
+
+  const code = searchParams.get("code");
   if (!code) {
     return signInFailed(request);
   }

@@ -17,11 +17,11 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.3 Auth | fix round 1 done (787a00f..874258f) – in re-review | docs/specs/m0-3-auth.md |
+| M0.3 Auth | review APPROVED after fix round 1 – in QA | docs/specs/m0-3-auth.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-Re-review M0.3 fix round 1 (diff 6cbd1c1..HEAD), then QA. Owner to confirm new Hebrew copy (login heading/error, unauthorized screen, sign-out). Deferred: E2E 'owner blocked by requireAdmin()' with the first settings screen. Manual staging/prod auth setup: docs/setup/supabase-auth.md.
+Run qa-engineer on M0.3. Perf note for later: proxy runs getClaims + is_allowed_user on each request incl. prefetch – revisit near DASH 2s target. Owner to confirm new Hebrew copy (login heading/error, unauthorized screen, sign-out). Deferred: E2E 'owner blocked by requireAdmin()' with the first settings screen. Manual staging/prod auth setup: docs/setup/supabase-auth.md.
 Carry into M0.3: CSP connect-src += Supabase URL; @types/node ^22; focus ring contrast fix; revisit enable_signup for Google OAuth; SQL-level test for missing/empty email claim; optional tests (normal emails accepted, ~3000-char email).
 Later (AUTH-5 UI): last-admin protection; trigger-enforced created_by/created_at.
 Environment: start Docker with `nohup dockerd >/tmp/dockerd.log 2>&1 &`; use SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io in the cloud sandbox.

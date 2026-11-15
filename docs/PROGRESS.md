@@ -10,6 +10,7 @@ Commit and push after every meaningful step.
 - M0.1: criteria approved as written; shell has a title only (no nav); nonce-based CSP.
 - M0.1 copy approved: home h1 "דף הבית", 404 "הדף לא נמצא" / "הכתובת שביקשת אינה קיימת."
 - Permissions-Policy: camera stays blocked until M3; open camera=(self) as part of M3 (expense photo capture).
+- 2026-11-15: owner created Supabase projects hkmanager-staging and hkmanager-prod (Free plan → 2 free projects confirmed in practice). Project refs/URLs: pending from owner.
 - Owner wants work committed continuously and resumed autonomously after interruptions.
 
 ## Status

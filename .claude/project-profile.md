@@ -5,46 +5,47 @@
 
 ## Spec
 <!-- The agents build from this. Put the spec file in the project and point to it here. -->
-- Spec file: C:\Projects\HKManager\SPEC.md
-- Supporting material: <paths to mockups, API docs, data samples, or none>
-- Acceptance criteria: <"in the spec, section X" / "not written yet: the lead drafts them for my approval">
-- Out of scope: <anything in the spec the agents must not build yet, or none>
+- Spec file: SPEC.md (repository root)
+- Supporting material: none
+- Acceptance criteria: requirement IDs in SPEC.md section 5 and tests in section 10. Per-feature numbered criteria are drafted by the lead for owner approval and saved in docs/specs/
+- Out of scope: everything in SPEC.md section 1 "Non-goals"; stage-2 items (DOC-7..9 API mode is design-only, `leads` table and website endpoint in 9.3 must not be created); iOS/Safari support of any kind. M5 is blocked until VERIFY-03 is closed; M7 until VERIFY-01, 02, 04, 05 are closed. Any OPEN-xx / VERIFY-xx item stops work and goes to the owner (SPEC.md section 0)
 
 ## Stack
-- Language: <e.g. TypeScript 5>
-- Framework: <e.g. Next.js 15 / Django 5 / Spring Boot 3>
-- UI layer: <e.g. React + Tailwind / none>
-- Data layer: <e.g. PostgreSQL + Prisma / none>
-- Package manager: <e.g. pnpm>
+- Language: TypeScript, strict mode (use the TypeScript major officially supported by the chosen Next.js version)
+- Framework: Next.js 16 (App Router, Server Components, Server Actions / Route Handlers)
+- UI layer: React + Tailwind CSS + shadcn/ui + Recharts; full RTL (`dir="rtl"`, `lang="he"`), mobile-first
+- Data layer: Supabase (Postgres with RLS, Auth, Storage, Edge Functions); schema changes via Supabase CLI migrations only; validation with zod shared by client and server
+- Package manager: pnpm
 
 ## Commands
-- Install: `<command>`
-- Run dev server: `<command>` (URL: <http://localhost:3000>)
-- Build: `<command>`
-- Lint: `<command>`
-- Format: `<command>`
-- Type check: `<command or none>`
-- Unit tests: `<command>`
-- E2E tests: `<command or none>`
+- Install: `pnpm install`
+- Run dev server: `pnpm dev` (URL: http://localhost:3000)
+- Build: `pnpm build`
+- Lint: `pnpm lint`
+- Format: `pnpm format`
+- Type check: `pnpm typecheck`
+- Unit tests: `pnpm test`
+- E2E tests: `pnpm test:e2e` (Playwright, Chromium only; pass `--trace off` unless debugging)
 
 ## Testing
-- Unit test tool: <e.g. Vitest / pytest / JUnit>
-- E2E tool: <e.g. Playwright / Cypress / none>
-- Test file location and naming: <e.g. next to source, *.test.ts>
-- Browser MCP available for manual QA: <yes: playwright / no>
+- Unit test tool: Vitest (unit, and integration against local Supabase)
+- E2E tool: Playwright, Chromium only, Android viewport and desktop. No WebKit/Safari
+- Test file location and naming: unit tests next to source as `*.test.ts(x)`; integration in `tests/integration/*.test.ts`; E2E in `tests/e2e/*.spec.ts`. Test names include the requirement ID (e.g. `MS-2: ...`)
+- Browser MCP available for manual QA: no (use Playwright scripts with the pre-installed Chromium)
 
 ## Structure
-- Source root: <e.g. src/>
-- UI components: <e.g. src/components/>
-- Design tokens / theme: <e.g. tailwind.config.ts, src/styles/tokens.css / none>
+- Source root: src/
+- UI components: src/components/ (shadcn/ui primitives in src/components/ui/)
+- Design tokens / theme: src/app/globals.css (Tailwind v4 theme tokens)
 - Specs folder: docs/specs/ (the lead saves approved acceptance criteria here)
 
 ## Conventions
-- Branching and commits: <e.g. feature branches, Conventional Commits>
-- Style guide beyond the linter: <link, file path, or none>
-- Design source: <Figma link / existing screens only / none>
-- Supported viewports: <e.g. 375, 768, 1280>
-- Languages and direction: <e.g. en LTR, he RTL>
+- Branching and commits: work on the session branch assigned by the environment; Conventional Commits
+- Style guide beyond the linter: SPEC.md section 0 (money as integer agorot, no float; migrations only; no unlisted dependencies or services)
+- Design source: none (neutral, clean UI per SPEC.md section 7)
+- Supported viewports: 360, 412 (Android), 1280 (desktop)
+- Languages and direction: he RTL only; ₪ only; DD/MM/YYYY; week starts Sunday; timezone Asia/Jerusalem
 
 ## Do not touch
-- <files, folders or systems the agents must never modify, or none>
+- SPEC.md (owner-only)
+- .claude/agents/, .claude/commands/, .claude/skills/

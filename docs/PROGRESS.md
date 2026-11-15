@@ -17,18 +17,10 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.2 Supabase local + RLS | review APPROVED, QA PASS – polish round 1 in progress (minor items) | docs/specs/m0-2-supabase-local.md |
+| M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-M0.2 polish round (senior-developer): new migration with email length<=254 + stricter format check; test asserts 22P02; robust test-user cleanup. Then quick re-review. After that: send owner docs/setup/supabase-accounts.md (prepared), then draft M0.3 criteria.
-M0.2 non-blocking review notes: tighten test asserts (22P02 for invalid role), robust test-user cleanup in beforeAll/afterAll; add SQL-level test for missing/empty email claim when M0.3 changes auth; consider trigger-enforced created_by/created_at (audit) and last-admin protection when AUTH-5 UI is built.
-Carry to M0.3: CSP connect-src must include the Supabase URL; @types/node ^20 -> ^22 (Vitest peer warning).
-Sandbox note: proxy blocks public.ecr.aws/ghcr.io blobs; run Supabase CLI with SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io in the cloud sandbox only (lead decision, not baked into scripts).
-M0.3 items: revisit enable_signup=false vs Google OAuth first sign-in; confirm trusting JWT email claim without verification check.
-Before M0.3/M0.4: lead prepares step-by-step Supabase account + staging/production project setup instructions for the owner (owner has no setup yet).
-Environment: Docker daemon is not running by default in the cloud container – start it with `nohup dockerd >/tmp/dockerd.log 2>&1 &` before `supabase start`.
-QA note for M0.3: default focus outline (outline-ring/50) is too light (<3:1) – fix when the first focusable element (login button) is added.
-Non-blocking review notes to carry forward: Tailwind runs via @tailwindcss/turbopack (no postcss config) – consider switching to @tailwindcss/postcss before shadcn components are added; production CSP style-src has no unsafe-inline – watch Recharts/Radix inline styles (M4); widen connect-src for Supabase/Sentry in M0.2/M0.5; @types/node ^20 vs Node 22; unused dark variant in globals.css.
-
-Note: shadcn CLI cannot reach ui.shadcn.com from the cloud sandbox (proxy 403) – components must be added manually or the host allowed.
-Before starting M0.2: draft its acceptance criteria and get owner approval (per feature.md).
+Owner to approve M0.3 (Auth) criteria – drafted in chat 2026-11-15; open decision: block non-allowlisted Google accounts at user creation (Supabase "before user created" auth hook) vs. sign-out only. Pending from owner: Supabase project IDs/URLs.
+Carry into M0.3: CSP connect-src += Supabase URL; @types/node ^22; focus ring contrast fix; revisit enable_signup for Google OAuth; SQL-level test for missing/empty email claim; optional tests (normal emails accepted, ~3000-char email).
+Later (AUTH-5 UI): last-admin protection; trigger-enforced created_by/created_at.
+Environment: start Docker with `nohup dockerd >/tmp/dockerd.log 2>&1 &`; use SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io in the cloud sandbox.

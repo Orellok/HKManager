@@ -16,10 +16,10 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.2 Supabase local + RLS | implemented; code review APPROVED (round 0) – in QA | docs/specs/m0-2-supabase-local.md |
+| M0.2 Supabase local + RLS | review APPROVED, QA PASS – polish round 1 in progress (minor items) | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-Run qa-engineer on M0.2. After PASS: send owner docs/setup/supabase-accounts.md (prepared), then draft M0.3 criteria.
+M0.2 polish round (senior-developer): new migration with email length<=254 + stricter format check; test asserts 22P02; robust test-user cleanup. Then quick re-review. After that: send owner docs/setup/supabase-accounts.md (prepared), then draft M0.3 criteria.
 M0.2 non-blocking review notes: tighten test asserts (22P02 for invalid role), robust test-user cleanup in beforeAll/afterAll; add SQL-level test for missing/empty email claim when M0.3 changes auth; consider trigger-enforced created_by/created_at (audit) and last-admin protection when AUTH-5 UI is built.
 Carry to M0.3: CSP connect-src must include the Supabase URL; @types/node ^20 -> ^22 (Vitest peer warning).
 Sandbox note: proxy blocks public.ecr.aws/ghcr.io blobs; run Supabase CLI with SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io in the cloud sandbox only (lead decision, not baked into scripts).

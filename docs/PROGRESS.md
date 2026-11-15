@@ -17,11 +17,14 @@ Commit and push after every meaningful step.
 | Feature | Status | Notes |
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
-| M0.3 Auth | review APPROVED, QA PASS – fix round 2 done (027797b, 0ffe11a) – in re-review | docs/specs/m0-3-auth.md |
+| M0.3 Auth | DONE – review APPROVED, QA PASS, 2 fix rounds (prefetch auth bypass; hook fail-closed + /login redirect) | |
+| M0.4 CI + migrations workflow | criteria drafted – awaiting owner approval | docs/specs/m0-3-auth.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-Re-review M0.3 fix round 2 (diff 7cd0ab2..HEAD). Then M0.3 done -> draft M0.4 (CI) criteria for owner approval. Known: upgrade-insecure-requests causes a console error on plain-http localhost after sign-out+Back (harmless on HTTPS); revoked-session cookie stays until requireAllowedUser runs – every page must call it. Perf note for later: proxy runs getClaims + is_allowed_user on each request incl. prefetch – revisit near DASH 2s target. Owner to confirm new Hebrew copy (login heading/error, unauthorized screen, sign-out). Deferred: E2E 'owner blocked by requireAdmin()' with the first settings screen. Manual staging/prod auth setup: docs/setup/supabase-auth.md.
+Owner to approve M0.4 criteria (drafted in chat). Owner to confirm M0.3 Hebrew copy (כניסה / הכניסה לא הושלמה… / אין הרשאה / כניסה עם חשבון אחר / יציאה).
+Manual staging check (when Google OAuth + staging exist): allowlisted Google account is created and reaches home – confirms GoTrue sends user_metadata.email_verified (hook fails closed otherwise).
+Proposed split: M0.4 CI + Supabase migrations workflows; M0.5 Sentry; M0.6 Netlify staging/prod deploy (needs owner Netlify account + VERIFY-02).
 Carry into M0.3: CSP connect-src += Supabase URL; @types/node ^22; focus ring contrast fix; revisit enable_signup for Google OAuth; SQL-level test for missing/empty email claim; optional tests (normal emails accepted, ~3000-char email).
 Later (AUTH-5 UI): last-admin protection; trigger-enforced created_by/created_at.
 Environment: start Docker with `nohup dockerd >/tmp/dockerd.log 2>&1 &`; use SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io in the cloud sandbox.

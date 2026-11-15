@@ -13,8 +13,10 @@ Commit and push after every meaningful step.
 ## Status
 | Feature | Status | Notes |
 |---|---|---|
-| M0.1 Scaffold | in progress – implementation | docs/specs/m0-1-scaffold.md |
+| M0.1 Scaffold | implemented (commits 6137e2d..9a4f879) – in code review | docs/specs/m0-1-scaffold.md |
 
 ## Next step
-Run senior-developer on M0.1, then review, then QA.
+Run code-reviewer on M0.1 (diff 3ef3132..HEAD), then QA.
+Open owner questions (non-blocking): placeholder Hebrew copy ("דף הבית", 404 "הדף לא נמצא"); Permissions-Policy camera=(self) now or at M3.
+Note: shadcn CLI cannot reach ui.shadcn.com from the cloud sandbox (proxy 403) – components must be added manually or the host allowed.
 Before starting M0.2: draft its acceptance criteria and get owner approval (per feature.md).

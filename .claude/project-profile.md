@@ -26,9 +26,11 @@
 - Type check: `pnpm typecheck`
 - Unit tests: `pnpm test`
 - E2E tests: `pnpm test:e2e` (Playwright, Chromium only; pass `--trace off` unless debugging)
+- Integration tests: `pnpm test:integration` (Vitest, `vitest.integration.config.mts`; needs the local stack from `pnpm db:start`)
+- Local database: `pnpm db:start`, `pnpm db:stop`, `pnpm db:reset` (Supabase CLI; on networks that block public.ecr.aws prefix with `SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io`)
 
 ## Testing
-- Unit test tool: Vitest (unit, and integration against local Supabase)
+- Unit test tool: Vitest (unit via `pnpm test`, DB-free; integration against local Supabase via `pnpm test:integration`)
 - E2E tool: Playwright, Chromium only, Android viewport and desktop. No WebKit/Safari
 - Test file location and naming: unit tests next to source as `*.test.ts(x)`; integration in `tests/integration/*.test.ts`; E2E in `tests/e2e/*.spec.ts`. Test names include the requirement ID (e.g. `MS-2: ...`)
 - Browser MCP available for manual QA: no (use Playwright scripts with the pre-installed Chromium)

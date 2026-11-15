@@ -4,17 +4,15 @@ import { promisify } from "node:util";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  getLocalSupabaseEnv as readLocalSupabaseEnv,
+  type LocalSupabaseEnv,
+} from "../../support/local-supabase-env";
+
 const execFileAsync = promisify(execFile);
 
-const LOCAL_HOSTNAMES = new Set(["127.0.0.1", "localhost"]);
 const CLI_TIMEOUT_MS = 60_000;
 const CLI_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
-
-export type LocalSupabaseEnv = {
-  url: string;
-  anonKey: string;
-  serviceRoleKey: string;
-};
 
 function runSupabaseCli(args: string[]): Promise<{ stdout: string }> {
   return execFileAsync("pnpm", ["exec", "supabase", ...args], {
@@ -23,73 +21,12 @@ function runSupabaseCli(args: string[]): Promise<{ stdout: string }> {
   });
 }
 
-function parseDotenv(text: string): Record<string, string> {
-  const values: Record<string, string> = {};
-  for (const line of text.split("\n")) {
-    const match = line.match(/^([A-Z0-9_]+)="?(.*?)"?$/);
-    if (match) {
-      values[match[1]] = match[2];
-    }
-  }
-  return values;
-}
-
-function assertLocalUrl(url: string): void {
-  const { hostname } = new URL(url);
-  if (!LOCAL_HOSTNAMES.has(hostname)) {
-    throw new Error(
-      `Integration tests run against local Supabase only; refusing to use ${hostname}`,
-    );
-  }
-}
-
-let cachedEnv: Promise<LocalSupabaseEnv> | undefined;
-
-async function resolveEnv(): Promise<LocalSupabaseEnv> {
-  const fromProcess = {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  };
-
-  let env: LocalSupabaseEnv;
-  if (fromProcess.url && fromProcess.anonKey && fromProcess.serviceRoleKey) {
-    env = {
-      url: fromProcess.url,
-      anonKey: fromProcess.anonKey,
-      serviceRoleKey: fromProcess.serviceRoleKey,
-    };
-  } else {
-    let stdout: string;
-    try {
-      ({ stdout } = await runSupabaseCli(["status", "-o", "env"]));
-    } catch (error) {
-      throw new Error("Local Supabase is not running. Start it with `pnpm db:start`.", {
-        cause: error,
-      });
-    }
-    const status = parseDotenv(stdout);
-    if (!status.API_URL || !status.ANON_KEY || !status.SERVICE_ROLE_KEY) {
-      throw new Error(
-        "`supabase status -o env` did not print API_URL, ANON_KEY and SERVICE_ROLE_KEY",
-      );
-    }
-    env = {
-      url: status.API_URL,
-      anonKey: status.ANON_KEY,
-      serviceRoleKey: status.SERVICE_ROLE_KEY,
-    };
-  }
-
-  assertLocalUrl(env.url);
-  return env;
-}
-
 /** Connection details of the local stack, from env vars or `supabase status`. */
-export function getLocalSupabaseEnv(): Promise<LocalSupabaseEnv> {
-  cachedEnv ??= resolveEnv();
-  return cachedEnv;
+export async function getLocalSupabaseEnv(): Promise<LocalSupabaseEnv> {
+  return readLocalSupabaseEnv();
 }
+
+export type { LocalSupabaseEnv };
 
 const NON_PERSISTENT_AUTH = {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },

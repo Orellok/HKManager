@@ -1,6 +1,10 @@
-import { expect, test, type APIResponse, type Page } from "@playwright/test";
+import type { APIResponse, Page } from "@playwright/test";
+
+import { getLocalSupabaseEnv } from "../support/local-supabase-env";
+import { expect, test } from "./support/auth-fixtures";
 
 const MISSING_PATH = "/this-page-does-not-exist";
+const SUPABASE_ORIGIN = new URL(getLocalSupabaseEnv().url).origin;
 
 const VIEWPORT_WIDTHS_BY_PROJECT: Record<string, number[]> = {
   android: [360, 412],
@@ -23,6 +27,7 @@ function expectSecurityHeaders(response: APIResponse) {
   expect(csp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
   expect(csp).toContain("frame-ancestors 'none'");
   expect(csp).toContain("object-src 'none'");
+  expect(csp).toContain(`connect-src 'self' ${SUPABASE_ORIGIN};`);
   expect(csp).not.toContain("'unsafe-inline'");
   expect(csp).not.toContain("'unsafe-eval'");
   expect(headers["x-content-type-options"]).toBe("nosniff");
@@ -52,6 +57,11 @@ async function trackCspViolations(page: Page): Promise<string[]> {
   return violations;
 }
 
+// "/" and unknown paths are protected since M0.3 (AUTH-3): these checks run signed in.
+test.beforeEach(async ({ signIn }) => {
+  await signIn({ role: "owner" });
+});
+
 test.describe("M0.1-4: RTL shell", () => {
   test("M0.1-4: html is Hebrew and right-to-left", async ({ page }) => {
     await page.goto("/");
@@ -78,7 +88,9 @@ test.describe("M0.1-4: RTL shell", () => {
   test("M0.1-4: header shows HKManager, main landmark exists, no navigation", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByRole("banner")).toHaveText("HKManager");
+    // M0.3-7 adds the sign-out button for a signed-in user; nothing else is in the header.
+    await expect(page.getByRole("banner")).toHaveText("HKManagerיציאה");
+    await expect(page.getByRole("banner").getByRole("button")).toHaveText(["יציאה"]);
     await expect(page.getByRole("main")).toHaveCount(1);
     await expect(page.getByRole("main")).toBeVisible();
     await expect(page.getByRole("navigation")).toHaveCount(0);
@@ -106,15 +118,15 @@ test.describe("M0.1-4: RTL shell", () => {
 });
 
 test.describe("M0.1-5: indexing blocked", () => {
-  test("M0.1-5: X-Robots-Tag on the home page", async ({ request }) => {
-    const response = await request.get("/");
+  test("M0.1-5: X-Robots-Tag on the home page", async ({ page }) => {
+    const response = await page.request.get("/");
 
     expect(response.status()).toBe(200);
     expect(response.headers()["x-robots-tag"]).toBe("noindex, nofollow");
   });
 
-  test("M0.1-5: X-Robots-Tag on a 404 response", async ({ request }) => {
-    const response = await request.get(MISSING_PATH);
+  test("M0.1-5: X-Robots-Tag on a 404 response", async ({ page }) => {
+    const response = await page.request.get(MISSING_PATH);
 
     expect(response.status()).toBe(404);
     expect(response.headers()["x-robots-tag"]).toBe("noindex, nofollow");
@@ -158,20 +170,25 @@ test.describe("M0.1-5: indexing blocked", () => {
 });
 
 test.describe("M0.1-6: security headers", () => {
-  test("M0.1-6: home page carries CSP and security headers", async ({ request }) => {
-    expectSecurityHeaders(await request.get("/"));
+  test("M0.1-6: home page carries CSP and security headers", async ({ page }) => {
+    const response = await page.request.get("/", { maxRedirects: 0 });
+
+    expect(response.status()).toBe(200);
+    expectSecurityHeaders(response);
   });
 
-  test("M0.1-6: 404 response carries CSP and security headers", async ({ request }) => {
-    const response = await request.get(MISSING_PATH);
+  test("M0.1-6: 404 response carries CSP and security headers", async ({ page }) => {
+    const response = await page.request.get(MISSING_PATH);
 
     expect(response.status()).toBe(404);
     expectSecurityHeaders(response);
   });
 
-  test("M0.1-6: CSP nonce is different on every request", async ({ request }) => {
-    const first = extractNonce((await request.get("/")).headers()["content-security-policy"]);
-    const second = extractNonce((await request.get("/")).headers()["content-security-policy"]);
+  test("M0.1-6: CSP nonce is different on every request", async ({ page }) => {
+    const nonceOf = async () =>
+      extractNonce((await page.request.get("/")).headers()["content-security-policy"]);
+    const first = await nonceOf();
+    const second = await nonceOf();
 
     expect(first).not.toBe(second);
   });

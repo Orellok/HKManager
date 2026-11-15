@@ -1,7 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { getLocalSupabaseEnv } from "./tests/support/local-supabase-env";
+
 const PORT = 3100;
 const BASE_URL = `http://localhost:${PORT}`;
+
+// The app and the auth fixtures run against the local Supabase stack (`pnpm db:start`).
+const supabase = getLocalSupabaseEnv();
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -27,5 +32,10 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: false,
     timeout: 240_000,
+    // Only the public values: the app itself never needs the service role key.
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: supabase.url,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: supabase.anonKey,
+    },
   },
 });

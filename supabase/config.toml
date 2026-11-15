@@ -1,0 +1,62 @@
+#:schema https://supabase.com/schemas/config/v1.json
+# Local development only (SPEC section 7: "Local (Supabase CLI)").
+# Reference: https://supabase.com/docs/guides/local-development/cli/config
+# Only what the current milestone needs is configured; every omitted key uses the CLI default.
+# Services the app does not use yet are disabled and are enabled by the feature that needs them.
+
+project_id = "hkmanager"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# No self sign-up (SPEC section 2). Local test users are created through the admin API.
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+# Email/password is enabled locally only so the integration tests can sign in test users.
+[auth.email]
+enabled = true
+enable_confirmations = false
+
+[realtime]
+enabled = false
+
+[storage]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
+
+[local_smtp]
+enabled = false

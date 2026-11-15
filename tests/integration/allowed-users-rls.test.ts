@@ -11,9 +11,13 @@ import {
 } from "./support/local-supabase";
 
 const TABLE = "allowed_users";
-const TEST_DOMAIN_PATTERN = "%@hkmanager.test";
+const TEST_DOMAIN_SUFFIX = "@hkmanager.test";
+const TEST_DOMAIN_PATTERN = `%${TEST_DOMAIN_SUFFIX}`;
 const INSUFFICIENT_PRIVILEGE = "42501";
 const UNIQUE_VIOLATION = "23505";
+const CHECK_VIOLATION = "23514";
+const INVALID_TEXT_REPRESENTATION = "22P02";
+const MAX_EMAIL_LENGTH = 254;
 
 type AllowedUserRow = {
   id: string;
@@ -56,6 +60,13 @@ async function readRowAsService(id: string): Promise<AllowedUserRow | null> {
   return data;
 }
 
+/** A unique address on the test domain with exactly `length` characters. */
+function emailOfLength(length: number): string {
+  const unique = testEmail("len").slice(0, -TEST_DOMAIN_SUFFIX.length);
+  const localPart = unique.padEnd(length - TEST_DOMAIN_SUFFIX.length, "a");
+  return `${localPart}${TEST_DOMAIN_SUFFIX}`;
+}
+
 async function callHelper(client: SupabaseClient, name: "is_allowed_user" | "is_admin") {
   return client.rpc(name);
 }
@@ -64,10 +75,13 @@ beforeAll(async () => {
   service = await createServiceRoleClient();
   anon = await createAnonClient();
 
+  // Each id is recorded as soon as the user exists, so a later failure here does not leak users.
   outsider = await createSignedInUser(service, testEmail("outsider"));
+  createdUserIds.push(outsider.id);
   owner = await createSignedInUser(service, testEmail("owner"));
+  createdUserIds.push(owner.id);
   admin = await createSignedInUser(service, testEmail("admin"));
-  createdUserIds.push(outsider.id, owner.id, admin.id);
+  createdUserIds.push(admin.id);
 
   // Stored in a different case from the auth email to prove the match is case-insensitive.
   await insertAllowlistRow(owner.email.toUpperCase(), "owner");
@@ -77,12 +91,20 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (service) {
+    const cleanupErrors: unknown[] = [];
     const { error } = await service.from(TABLE).delete().ilike("email", TEST_DOMAIN_PATTERN);
-    for (const userId of createdUserIds) {
-      await deleteUser(service, userId);
-    }
     if (error) {
-      throw new Error("Could not clean up allowlist test rows", { cause: error });
+      cleanupErrors.push(error);
+    }
+    for (const userId of createdUserIds) {
+      try {
+        await deleteUser(service, userId);
+      } catch (deleteError) {
+        cleanupErrors.push(deleteError);
+      }
+    }
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(cleanupErrors, "Could not clean up integration test data");
     }
   }
 });
@@ -101,7 +123,37 @@ describe("allowed_users schema", () => {
       .from(TABLE)
       .insert({ email: testEmail("bad-role"), role: "viewer" });
 
-    expect(error).not.toBeNull();
+    expect(error?.code).toBe(INVALID_TEXT_REPRESENTATION);
+  });
+
+  it("AUTH-4: accepts an email of exactly 254 characters", async () => {
+    const email = emailOfLength(MAX_EMAIL_LENGTH);
+    const { data, error } = await admin.client
+      .from(TABLE)
+      .insert({ email, role: "owner" })
+      .select()
+      .single<AllowedUserRow>();
+
+    expect(error).toBeNull();
+    expect(data?.email).toBe(email);
+  });
+
+  it("AUTH-4: rejects an email longer than 254 characters with a check violation", async () => {
+    const { error } = await admin.client
+      .from(TABLE)
+      .insert({ email: emailOfLength(MAX_EMAIL_LENGTH + 1), role: "owner" });
+
+    expect(error?.code).toBe(CHECK_VIOLATION);
+  });
+
+  it.each([
+    ["more than one @", "a@b@hkmanager.test"],
+    ["a space", "a b@hkmanager.test"],
+    ["a newline", "a\nb@hkmanager.test"],
+  ])("AUTH-4: rejects an email containing %s", async (_case, email) => {
+    const { error } = await admin.client.from(TABLE).insert({ email, role: "owner" });
+
+    expect(error?.code).toBe(CHECK_VIOLATION);
   });
 });
 

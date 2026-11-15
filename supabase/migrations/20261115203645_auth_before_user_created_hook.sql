@@ -7,7 +7,7 @@
 -- through the hook; that is how local test users are created.
 --
 -- Wiring: locally in supabase/config.toml ([auth.hook.before_user_created]); on hosted projects
--- in the dashboard (Authentication -> Hooks), see docs/setup/google-auth.md.
+-- in the dashboard (Authentication -> Hooks), see docs/setup/supabase-auth.md.
 
 -- The only sign-in method of the app (SPEC section 2): Google Sign-In.
 create function public.hook_before_user_created(event jsonb)

@@ -62,7 +62,7 @@ enabled = true
 uri = "pg-functions://postgres/public/hook_before_user_created"
 
 # AUTH-1: Google Sign-In. Credentials come from the environment (never commit them); see
-# .env.example and docs/setup/google-auth.md. Without them the stack still starts and only the
+# .env.example and docs/setup/supabase-auth.md. Without them the stack still starts and only the
 # Google button fails, which is enough for the tests: they create sessions without Google.
 [auth.external.google]
 enabled = true

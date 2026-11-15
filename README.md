@@ -21,6 +21,19 @@ Studio runs at http://127.0.0.1:54323.
 Schema changes are made only through SQL migrations in `supabase/migrations/`
 (`pnpm exec supabase migration new <name>`), never by editing a database by hand.
 
+### Sign-in (Supabase Auth)
+
+- Google Sign-In is the only way in (SPEC section 2). Locally it needs the
+  `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` variables
+  when `pnpm db:start` runs (see `.env.example`); without them the stack starts and only the
+  real Google round-trip fails.
+- A "before user created" hook (`public.hook_before_user_created`, wired in
+  `supabase/config.toml`) lets Supabase Auth create only Google accounts that are on the
+  allowlist. Email/password sign-up is rejected for everyone. Local test users are created
+  through the admin API, which does not pass through the hook.
+- Staging and production are configured in the Supabase dashboard:
+  `docs/setup/supabase-auth.md`.
+
 ### Restricted networks (optional)
 
 By default the CLI pulls its images from public.ecr.aws. If that registry is blocked on your
@@ -52,8 +65,12 @@ on conflict ((lower(email))) do update set role = excluded.role;
 ```bash
 pnpm test               # unit tests (Vitest), no database needed
 pnpm test:integration   # integration tests (Vitest) against the local stack; run pnpm db:start first
-pnpm test:e2e           # end-to-end tests (Playwright, Chromium)
+pnpm test:e2e           # end-to-end tests (Playwright, Chromium); run pnpm db:start first
 ```
+
+The E2E tests build and start the app against the local stack and sign in without Google:
+a fixture creates a test account through the local admin API and sets the session cookies
+in the browser.
 
 The integration tests create their own users through the local admin API and delete them
 afterwards. They read the keys from `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`

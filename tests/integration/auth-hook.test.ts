@@ -41,10 +41,12 @@ function userCreatedEvent(user: Record<string, unknown>) {
   };
 }
 
+/** A Google sign-up with a verified email, shaped like Supabase Auth v2.197.0's event. */
 function googleUser(email: unknown) {
   return userCreatedEvent({
     email,
     app_metadata: { provider: "google", providers: ["google"] },
+    user_metadata: { email, email_verified: true },
   });
 }
 
@@ -145,15 +147,22 @@ describe("before-user-created hook: decision", () => {
   });
 
   it.each([
-    ["false", false],
-    ["the string 'false'", "false"],
+    ["false", { email_verified: false }],
+    ["the string 'false'", { email_verified: "false" }],
+    ["the string 'False'", { email_verified: "False" }],
+    ["absent", {}],
+    ["null", { email_verified: null }],
+    ["0", { email_verified: 0 }],
+    ["1", { email_verified: 1 }],
+    ["an empty string", { email_verified: "" }],
+    ["the string 'yes'", { email_verified: "yes" }],
   ])(
     "AUTH-2: rejects an allowlisted Google account whose email_verified is %s",
-    async (_case, value) => {
+    async (_case, userMetadata) => {
       const event = userCreatedEvent({
         email: allowlistedEmail,
         app_metadata: { provider: "google", providers: ["google"] },
-        user_metadata: { email: allowlistedEmail, email_verified: value },
+        user_metadata: { email: allowlistedEmail, ...userMetadata },
       });
 
       expect(await expectHookResponse(event)).toEqual({
@@ -164,7 +173,8 @@ describe("before-user-created hook: decision", () => {
 
   it.each([
     ["true", { email_verified: true }],
-    ["absent", {}],
+    ["the string 'true'", { email_verified: "true" }],
+    ["the string 'TRUE'", { email_verified: "TRUE" }],
   ])(
     "AUTH-2: allows an allowlisted Google account whose email_verified is %s",
     async (_case, userMetadata) => {

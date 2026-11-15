@@ -43,15 +43,26 @@ function enforce(decision: AccessDecision): void {
 }
 
 /**
+ * AUTH-2 / AUTH-3: the access decision for the current request, from the verified user
+ * (`getUser`) and `is_allowed_user()`. Memoized per render.
+ */
+export const getUserAccess = cache(
+  async (): Promise<{ user: User | null; decision: AccessDecision }> => {
+    const user = await getVerifiedUser();
+    const isAllowed = user ? await fetchIsAllowedUser(await createSupabaseServerClient()) : false;
+    return { user, decision: decideUserAccess({ hasUser: user !== null, isAllowed }) };
+  },
+);
+
+/**
  * AUTH-2 / AUTH-3: returns the user of a valid, allowlisted session, or redirects. Call it at
  * the top of every protected page, Server Function and Route Handler: `await
  * requireAllowedUser()`. Memoized per render, so calling it from a layout and a page costs
  * one check.
  */
 export const requireAllowedUser = cache(async (): Promise<User> => {
-  const user = await getVerifiedUser();
-  const isAllowed = user ? await fetchIsAllowedUser(await createSupabaseServerClient()) : false;
-  enforce(decideUserAccess({ hasUser: user !== null, isAllowed }));
+  const { user, decision } = await getUserAccess();
+  enforce(decision);
   return user as User; // enforce() redirected unless the user exists and is allowed.
 });
 

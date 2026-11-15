@@ -160,6 +160,33 @@ test.describe("M0.3-2: login screen", () => {
   });
 });
 
+test.describe("M0.3-2: login screen for signed-in users", () => {
+  test("M0.3-2: an allowlisted signed-in user opening /login is sent to the home page", async ({
+    page,
+    signIn,
+  }) => {
+    await signIn({ role: "owner" });
+
+    await page.goto("/login");
+
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("דף הבית");
+  });
+
+  test("M0.3-2: a signed-in user outside the allowlist opening /login stays on /login", async ({
+    page,
+    signIn,
+  }) => {
+    await signIn({ role: null });
+
+    await page.goto("/login");
+
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("button", { name: "כניסה עם Google" })).toBeVisible();
+    await expect(page.getByText("דף הבית")).toHaveCount(0);
+  });
+});
+
 test.describe("AUTH-1: Google OAuth", () => {
   test("AUTH-1: the button starts Supabase's Google flow with PKCE and our callback", async ({
     page,

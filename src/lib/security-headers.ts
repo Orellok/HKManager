@@ -26,12 +26,35 @@ type CspOptions = {
   nonce: string;
   /** Development needs 'unsafe-eval' (React debug stacks) and inline styles (dev overlay). */
   isDevelopment: boolean;
+  /** The configured Supabase URL; the browser client may call it (connect-src). */
+  supabaseUrl: string;
 };
 
-export function buildContentSecurityPolicy({ nonce, isDevelopment }: CspOptions): string {
+/** The origin of an http(s) URL, used as a CSP source. Throws on anything else. */
+function httpOrigin(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch (error) {
+    throw new Error("The Supabase URL for the Content-Security-Policy is not a valid URL", {
+      cause: error,
+    });
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error("The Supabase URL for the Content-Security-Policy must use http or https");
+  }
+  return parsed.origin;
+}
+
+export function buildContentSecurityPolicy({
+  nonce,
+  isDevelopment,
+  supabaseUrl,
+}: CspOptions): string {
   if (nonce.trim() === "") {
     throw new Error("A non-empty nonce is required to build the Content-Security-Policy");
   }
+  const supabaseOrigin = httpOrigin(supabaseUrl);
 
   const nonceSource = `'nonce-${nonce}'`;
   const scriptSources = ["'self'", nonceSource, "'strict-dynamic'"];
@@ -46,7 +69,7 @@ export function buildContentSecurityPolicy({ nonce, isDevelopment }: CspOptions)
     ["style-src", styleSources],
     ["img-src", ["'self'", "blob:", "data:"]],
     ["font-src", ["'self'"]],
-    ["connect-src", ["'self'"]],
+    ["connect-src", ["'self'", supabaseOrigin]],
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", ["'self'"]],

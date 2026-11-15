@@ -23,7 +23,8 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Focus indicator: at least 3:1 against --background and --primary (WCAG 1.4.11). */
+  --ring: oklch(0.556 0 0);
 }
 
 @theme inline {
@@ -54,7 +55,12 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
+  }
+  /* A solid, opaque focus indicator; the browser's "auto" outline ignores the ring token. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;

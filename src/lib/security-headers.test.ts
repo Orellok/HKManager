@@ -6,6 +6,8 @@ import {
   generateNonce,
 } from "./security-headers";
 
+const SUPABASE_URL = "https://project-ref.supabase.co";
+
 function directive(policy: string, name: string): string | undefined {
   return policy
     .split(";")
@@ -15,7 +17,11 @@ function directive(policy: string, name: string): string | undefined {
 
 describe("buildContentSecurityPolicy", () => {
   it("M0.1-6: production policy allows scripts and styles only with the request nonce", () => {
-    const policy = buildContentSecurityPolicy({ nonce: "abc123", isDevelopment: false });
+    const policy = buildContentSecurityPolicy({
+      nonce: "abc123",
+      isDevelopment: false,
+      supabaseUrl: SUPABASE_URL,
+    });
 
     expect(directive(policy, "script-src")).toBe(
       "script-src 'self' 'nonce-abc123' 'strict-dynamic'",
@@ -24,14 +30,22 @@ describe("buildContentSecurityPolicy", () => {
   });
 
   it("M0.1-6: production policy never allows unsafe-eval or unsafe-inline", () => {
-    const policy = buildContentSecurityPolicy({ nonce: "abc123", isDevelopment: false });
+    const policy = buildContentSecurityPolicy({
+      nonce: "abc123",
+      isDevelopment: false,
+      supabaseUrl: SUPABASE_URL,
+    });
 
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).not.toContain("'unsafe-inline'");
   });
 
   it("M0.1-6: development policy adds unsafe-eval for scripts and inline styles", () => {
-    const policy = buildContentSecurityPolicy({ nonce: "abc123", isDevelopment: true });
+    const policy = buildContentSecurityPolicy({
+      nonce: "abc123",
+      isDevelopment: true,
+      supabaseUrl: SUPABASE_URL,
+    });
 
     expect(directive(policy, "script-src")).toBe(
       "script-src 'self' 'nonce-abc123' 'strict-dynamic' 'unsafe-eval'",
@@ -40,7 +54,11 @@ describe("buildContentSecurityPolicy", () => {
   });
 
   it("M0.1-6: forbids framing, plugins and foreign base URIs", () => {
-    const policy = buildContentSecurityPolicy({ nonce: "n", isDevelopment: false });
+    const policy = buildContentSecurityPolicy({
+      nonce: "n",
+      isDevelopment: false,
+      supabaseUrl: SUPABASE_URL,
+    });
 
     expect(directive(policy, "frame-ancestors")).toBe("frame-ancestors 'none'");
     expect(directive(policy, "object-src")).toBe("object-src 'none'");
@@ -49,15 +67,52 @@ describe("buildContentSecurityPolicy", () => {
   });
 
   it("M0.1-6: produces a single-line header value", () => {
-    const policy = buildContentSecurityPolicy({ nonce: "n", isDevelopment: false });
+    const policy = buildContentSecurityPolicy({
+      nonce: "n",
+      isDevelopment: false,
+      supabaseUrl: SUPABASE_URL,
+    });
 
     expect(policy).not.toMatch(/[\r\n]/);
     expect(policy.endsWith(";")).toBe(true);
   });
 
   it("M0.1-6: rejects an empty nonce", () => {
-    expect(() => buildContentSecurityPolicy({ nonce: "", isDevelopment: false })).toThrow();
-    expect(() => buildContentSecurityPolicy({ nonce: "   ", isDevelopment: false })).toThrow();
+    for (const nonce of ["", "   "]) {
+      expect(() =>
+        buildContentSecurityPolicy({ nonce, isDevelopment: false, supabaseUrl: SUPABASE_URL }),
+      ).toThrow();
+    }
+  });
+
+  it("M0.3-8: connect-src allows only 'self' and the Supabase origin", () => {
+    const policy = buildContentSecurityPolicy({
+      nonce: "n",
+      isDevelopment: false,
+      supabaseUrl: `${SUPABASE_URL}/some/path?x=1`,
+    });
+
+    expect(directive(policy, "connect-src")).toBe(`connect-src 'self' ${SUPABASE_URL}`);
+  });
+
+  it("M0.3-8: keeps the port of a local Supabase URL in connect-src", () => {
+    const policy = buildContentSecurityPolicy({
+      nonce: "n",
+      isDevelopment: true,
+      supabaseUrl: "http://127.0.0.1:54321",
+    });
+
+    expect(directive(policy, "connect-src")).toBe("connect-src 'self' http://127.0.0.1:54321");
+  });
+
+  it.each([
+    ["an empty value", ""],
+    ["a value that is not a URL", "not a url"],
+    ["a non-http scheme", "javascript:alert(1)"],
+  ])("M0.3-8: rejects %s as the Supabase URL", (_case, supabaseUrl) => {
+    expect(() =>
+      buildContentSecurityPolicy({ nonce: "n", isDevelopment: false, supabaseUrl }),
+    ).toThrow();
   });
 });
 

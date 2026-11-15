@@ -15,10 +15,11 @@ Commit and push after every meaningful step.
 ## Status
 | Feature | Status | Notes |
 |---|---|---|
-| M0.1 Scaffold | implemented (commits 6137e2d..9a4f879) – in code review | docs/specs/m0-1-scaffold.md |
+| M0.1 Scaffold | implemented; code review APPROVED (round 0) – in QA | docs/specs/m0-1-scaffold.md |
 
 ## Next step
-Run code-reviewer on M0.1 (diff 3ef3132..HEAD), then QA.
+Run qa-engineer on M0.1. After QA PASS: draft M0.2 criteria for owner approval.
+Non-blocking review notes to carry forward: Tailwind runs via @tailwindcss/turbopack (no postcss config) – consider switching to @tailwindcss/postcss before shadcn components are added; production CSP style-src has no unsafe-inline – watch Recharts/Radix inline styles (M4); widen connect-src for Supabase/Sentry in M0.2/M0.5; @types/node ^20 vs Node 22; unused dark variant in globals.css.
 
 Note: shadcn CLI cannot reach ui.shadcn.com from the cloud sandbox (proxy 403) – components must be added manually or the host allowed.
 Before starting M0.2: draft its acceptance criteria and get owner approval (per feature.md).

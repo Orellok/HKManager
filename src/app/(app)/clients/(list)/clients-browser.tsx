@@ -6,22 +6,15 @@ import { useRef, useState, useTransition, type FormEvent } from "react";
 import { Button, buttonClasses } from "@/components/button";
 import { searchClientsAction } from "@/lib/clients/actions";
 import { NEW_CLIENT_PATH, clientPath } from "@/lib/clients/paths";
-import type { ClientListItem, ClientListPage, ClientListView } from "@/lib/clients/queries";
+import type { ClientListPage, ClientListView } from "@/lib/clients/queries";
 import { CLIENT_SEARCH_QUERY_MAX_LENGTH } from "@/lib/clients/schema";
+
+import { appendPage, type BrowserState } from "./browser-state";
 
 type ClientsBrowserProps = {
   view: ClientListView;
   /** The first page of the list without a search, rendered on the server. */
   initialPage: ClientListPage;
-};
-
-type BrowserState = {
-  /** The search that produced `items`; "" for the full list. */
-  query: string;
-  items: ClientListItem[];
-  hasMore: boolean;
-  /** Set once the user searched, so the result count is announced. */
-  searched: boolean;
 };
 
 const SEARCH_FAILED = "החיפוש נכשל. אפשר לנסות שוב.";
@@ -70,6 +63,9 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (morePending) {
+      return;
+    }
     search(inputRef.current?.value.trim() ?? "");
   }
 
@@ -83,21 +79,14 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
 
   function loadMore() {
     setError(null);
+    const request = { query: state.query, offset: state.items.length };
     startLoadMore(async () => {
-      const result = await searchClientsAction({
-        view,
-        query: state.query,
-        offset: state.items.length,
-      });
+      const result = await searchClientsAction({ view, ...request });
       if (!result.ok) {
         setError(LOAD_MORE_FAILED);
         return;
       }
-      setState((previous) => ({
-        ...previous,
-        items: [...previous.items, ...result.page.items],
-        hasMore: result.page.hasMore,
-      }));
+      setState((previous) => appendPage(previous, request, result.page));
     });
   }
 
@@ -120,11 +109,15 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
             enterKeyHint="search"
             className="border-input bg-background min-h-11 min-w-0 flex-1 basis-48 rounded-md border px-3 text-base"
           />
-          <Button type="submit" disabled={searchPending} aria-busy={searchPending}>
+          <Button type="submit" disabled={searchPending || morePending} aria-busy={searchPending}>
             {searchPending ? "מחפש…" : "חיפוש"}
           </Button>
           {isSearchActive ? (
-            <Button variant="secondary" onClick={clearSearch} disabled={searchPending}>
+            <Button
+              variant="secondary"
+              onClick={clearSearch}
+              disabled={searchPending || morePending}
+            >
               ניקוי החיפוש
             </Button>
           ) : null}

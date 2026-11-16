@@ -18,11 +18,11 @@ Commit and push after every meaningful step.
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
 | M0.3 Auth | DONE – review APPROVED, QA PASS, 2 fix rounds (prefetch auth bypass; hook fail-closed + /login redirect) | docs/specs/m0-3-auth.md |
-| M0.4 CI + migrations workflow | criteria drafted – awaiting owner approval | – |
+| M0.4 CI + migrations workflow | criteria approved – in implementation | docs/specs/m0-4-ci.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-Owner to approve M0.4 criteria (drafted in chat). Owner to confirm M0.3 Hebrew copy (כניסה / הכניסה לא הושלמה… / אין הרשאה / כניסה עם חשבון אחר / יציאה).
+Run senior-developer on M0.4, then review, then QA. (2026-11-16: owner approved M0.4 criteria, revised M0 split and M0.3 Hebrew copy.)
 Manual staging check (when Google OAuth + staging exist): allowlisted Google account is created and reaches home – confirms GoTrue sends user_metadata.email_verified (hook fails closed otherwise).
 Proposed split: M0.4 CI + Supabase migrations workflows; M0.5 Sentry; M0.6 Netlify staging/prod deploy (needs owner Netlify account + VERIFY-02).
 Carry into M0.3: CSP connect-src += Supabase URL; @types/node ^22; focus ring contrast fix; revisit enable_signup for Google OAuth; SQL-level test for missing/empty email claim; optional tests (normal emails accepted, ~3000-char email).

@@ -15,6 +15,7 @@ Commit and push after every meaningful step.
 - 2026-11-16: owner approved M1.1 round-2 copy ("לא ניתן לשמור כרגע…", "הפעולה לא בוצעה…", "לא הצלחנו לטעון את הדף").
 - 2026-11-16: owner approved M1.2 copy and bounds (₪ after number per he-IL, ₪99,999,999.99 max, dates 1900–2100, 500-client hint wording, 50 projects on client card, range/digit messages).
 - 2026-11-16: owner wants small PRs to main. Stacked PRs opened: Orellok/HKManager#1 (M0, branch claude/pr-1-m0-foundation @77f541a), #2 (M1.1, claude/pr-2-m1.1-clients @d3d1619), #3 (M1.2, claude/pr-3-m1.2-projects @6181bf8). Owner merged all 3 at once: #1 reached main; #2/#3 landed only in stacked base branches → catch-up PR Orellok/HKManager#4 (claude/pr-2-m1.1-clients → main). #4 merged by owner 2026-11-16 – main now contains M0, M1.1, M1.2. Lesson: no more stacked PRs – each feature PR targets main directly after the previous one merged. Going forward: one PR per feature from a branch at the feature's DONE commit; development continues on claude/adoring-rubin-yrdzla.
+- 2026-11-16: owner approved M1.3 deviations/copy (100 milestones/project, no warning with 0 milestones, past-due amount-0 = מתוכנן, 'חזרה') and M2 plan (split M2.1/M2.2, income amount > 0, no future received date, no payments for cancelled milestones, 'הכנסות' as 5th nav item).
 - Owner wants work committed continuously and resumed autonomously after interruptions.
 
 ## Status
@@ -26,14 +27,14 @@ Commit and push after every meaningful step.
 | M1.1 Clients | DONE – review APPROVED, QA PASS, 3 fix rounds (duplicate notice; action errors/focus/CSP/CRLF; expired session) | docs/specs/m1-1-clients.md |
 | M1.2 Projects | DONE – review APPROVED, QA PASS, 2 fix rounds (polish: session 4xx rule, filter queue, date min/max; minor: partial date, range/digit messages) | docs/specs/m1-2-projects.md |
 | M1.3 Milestones + open debts | DONE – review APPROVED, QA PASS, 1 polish round (sort_order bound, server-side move result, test robustness) | docs/specs/m1-3-milestones.md | docs/specs/m1-3-milestones.md |
-| M2.1 Incomes + payments | criteria drafted – awaiting owner approval | – |
+| M2.1 Incomes + payments | criteria approved – in implementation | docs/specs/m2-1-incomes.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run); (5) Netlify account + 2 sites + NETLIFY_AUTH_TOKEN (docs/setup/netlify.md).
 VERIFY-02 checked 2026-11-16 (docs/verify/VERIFY-02-netlify.md): commercial use OK, Next 16 supported; OPEN: proxy.ts (Node runtime) on Netlify – gate on first staging deploy; credit budget (hard pause).
 Owner approved (2026-11-16): start M1 in parallel; split M1.1 Clients (CLI-1..4), M1.2 Projects (PRJ-1..3), M1.3 Milestones (MS-1..3, MS-6); MS-4/5 move to M2. M0.5 Sentry / M0.6 Netlify wait for owner accounts.
-M1.3 PR: Orellok/HKManager#5 (claude/feature-m1.3-milestones). Now: owner to approve M2 split + M2.1 criteria (drafted in chat): M2.1 incomes + record payment (INC-1,2,5,6, MS-4/5, paid statuses, client/project paid & balance, audit_log, soft delete); M2.2 receipts documentation (DOC-1..6, INC-3/4, Storage PDF upload, quota).
+M1.3 PR Orellok/HKManager#5 merged by owner. Now: run senior-developer on M2.1, then review, then QA (sequentially, not in parallel), then feature PR to main.
 Carry into M2: (1) deleting the last milestone loses focus + announcement (live region inside MilestoneList unmounts); (2) shared RedirectNotice: ?notice= reappears after router refresh following an in-page Server Action (also in M1.2) – strip/consume notice robustly.
 Lesson: do not run reviewer and QA E2E suites in parallel – they share the local Supabase stack and test users (5 false failures). Carry: debts paging E2E should seed at 1900-01-01 to be order-independent. Owner to confirm M1.3 copy + deviations (100 milestones/project, no warning with 0 milestones, past-due amount-0 = מתוכנן, 'חזרה' dismiss label, view without status column).
 Carry into M1.3: isIsoDate uses Date.UTC which maps years 0–99 to 1900s → years 0001–0099 get generic date message instead of range message (use setUTCFullYear). Lead decision: no-JS partial date saved as empty is acceptable (PWA on Chrome always runs JS). Owner to confirm M1.2 Hebrew copy + bounds. Lead concern: criterion 11(a) too narrow – invalid refresh token (AuthApiError 400) should count as 'ended'; only 429/5xx/network = 'unknown'.

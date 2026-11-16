@@ -1,0 +1,21 @@
+# M2.1 – Incomes and recording payments
+
+Source: SPEC.md sections 0, 4, 5.2 (CLI-4), 5.3 (PRJ-3), 5.4 (MS-2, MS-4, MS-5), 5.5 (INC-1, INC-2, INC-5, INC-6), 6 (`incomes`, `audit_log`, `milestone_balances`), 7, 8, 10. Approved by the owner on 2026-11-16.
+M2 split (owner-approved): M2.1 incomes + payments; M2.2 receipts documentation (DOC-1..6, INC-3, INC-4, Storage PDF, monthly quota).
+
+## Acceptance criteria
+
+1. Migration creates `incomes`: common fields, `client_id` (FK RESTRICT, required), `project_id` (FK RESTRICT, nullable), `milestone_id` (FK RESTRICT, nullable), `received_date`, `amount` (bigint agorot), `payment_method`, `notes`, `deleted_at` (soft delete – SPEC 6 forbids physical deletion of financial records). DB-enforced consistency: if `milestone_id` is set, `project_id` must be that milestone's project; if `project_id` is set, `client_id` must be that project's client. Indexes on dates and FKs. RLS via `is_allowed_user()`; column grants; no DELETE grant for users.
+2. Migration creates `audit_log` (actor, entity, entity_id, action, diff jsonb, created_at) written by DB triggers on incomes insert/update/soft-delete; readable only by allowlisted users, not writable by users directly. Diff contains no more than the changed income fields.
+3. **Owner decisions:** amount > 0 (≤ the existing upper bound); `received_date` not in the future (Asia/Jerusalem today) and within the existing date range; `payment_method` one of: העברה בנקאית, ביט/פייבוקס, מזומן, צ'ק, אשראי, אחר (INC-5).
+4. MS-4: "רשום תשלום" on each non-cancelled milestone creates an income linked to the milestone; amount defaults to the balance; multiple payments per milestone allowed (INC-6: each payment = one income). **Owner decision:** no payments for a cancelled milestone (DB-enforced).
+5. MS-5: paying more than the milestone balance shows a warning and requires explicit confirmation (not blocking).
+6. MS-2 completed: `milestone_balances.paid` = sum of non-deleted incomes for the milestone; statuses `partially_paid` and `paid` added in the shared status function; the debts screen (MS-6) and the MS-3 totals reflect real balances. A milestone with payments cannot be deleted (FK RESTRICT) – only cancelled.
+7. INC-1/INC-2: income form (create/edit) – client required, project and milestone optional (project limits milestone choices; choosing a milestone fills project and client); income without a project allowed. Edit and soft delete allowed in M2.1 (blocking after a receipt arrives in M2.2).
+8. **Owner decision – navigation:** add "הכנסות" as the 5th nav item. Incomes screen: list ordered by `received_date` desc, filter by month and by client, bounded paging, month total.
+9. PRJ-3 / CLI-4: project card shows contract amount, paid, balance (contract − paid, when contract set) and the milestones with their payments; client card shows total paid and open balance (sum of milestone balances of its non-archived projects – shown with a clear label). Money sums without floats.
+10. Lessons from previous features apply (inline errors with input kept, expired-session redirect, focus, nonce CSP, no personal data in URLs/logs, ref-based in-flight guard, money without floats, dates without timezone shift, `requireAllowedUser()` everywhere).
+11. Carry-overs from M1.3: (a) deleting the last milestone keeps focus and the announcement; (b) the shared RedirectNotice must not reappear after a router refresh following an in-page Server Action (fix for clients, projects, milestones).
+12. States, accessibility (WCAG 2.1 AA), RTL, no horizontal scroll at 360/412/1280 (nav with 5 items included).
+13. Tests: unit (status incl. partial/overpaid, balances, overpayment detection, date-not-in-future at Asia/Jerusalem midnight); integration (RLS; no DELETE; soft delete; consistency triggers; cancelled-milestone rule; audit_log contents and protection; FK restrict); E2E on android and desktop (record payment default balance, partial + completing payment, overpayment confirm, income without project, edit, soft delete, incomes list filters and total, card paid/balance, debts reflect payments, network failure/offline). Test names include MS-2/4/5, INC-1/2/5/6, PRJ-3, CLI-4.
+14. Out of scope: receipts / document status / blocking edits after receipt (M2.2), CSV export (M4), dashboard (M4).

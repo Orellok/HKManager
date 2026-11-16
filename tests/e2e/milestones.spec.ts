@@ -577,6 +577,14 @@ test_.describe("MS-6: open debts", () => {
 
       const list = page.getByRole("list", { name: "רשימת החובות הפתוחים" });
       const mine = list.getByRole("listitem").filter({ hasText: token });
+      // The list is global: debts of tests running at the same time may come first and push
+      // these past the first page, so load pages until both are shown.
+      const loadMore = page.getByRole("button", { name: "הצגת חובות נוספים" });
+      while ((await mine.count()) < 2 && (await loadMore.isVisible())) {
+        const shown = await list.getByRole("listitem").count();
+        await loadMore.click();
+        await expect(list.getByRole("listitem")).not.toHaveCount(shown);
+      }
       await expect(mine).toHaveCount(2);
       await expect(mine.nth(0)).toContainText(`ישן ${token}`);
       await expect(mine.nth(0)).toContainText(ddmmyyyy(older));

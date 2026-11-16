@@ -109,8 +109,14 @@ describe("project schema", () => {
     ["12.505", PROJECT_FIELD_MESSAGES.amountTooManyDecimals],
     ["-100", PROJECT_FIELD_MESSAGES.amountNegative],
     ["100,000,000", PROJECT_FIELD_MESSAGES.amountTooLarge],
+    ["١٢٣", PROJECT_FIELD_MESSAGES.amountLatinDigits],
+    ["１２,５００", PROJECT_FIELD_MESSAGES.amountLatinDigits],
   ])("PRJ-1: rejects the contract amount %j", (contract_amount, message) => {
     expect(fieldErrors(values({ contract_amount }))).toEqual({ contract_amount: message });
+  });
+
+  it("PRJ-1: the non-Latin digits message says which digits to use", () => {
+    expect(PROJECT_FIELD_MESSAGES.amountLatinDigits).toBe("יש להזין את הסכום בספרות 0–9 בלבד.");
   });
 
   it("PRJ-1: the too-large message names the limit in shekels", () => {
@@ -118,14 +124,30 @@ describe("project schema", () => {
     expect(PROJECT_FIELD_MESSAGES.amountTooLarge).toContain("₪");
   });
 
-  it.each(["2026-02-30", "16/11/2026", "1899-12-31", "2101-01-01", "x"])(
-    "PRJ-1: rejects the start date %j",
+  it.each(["2026-02-30", "16/11/2026", "x", "0000-01-01"])(
+    "PRJ-1: rejects the start date %j as not a date",
     (start_date) => {
       expect(fieldErrors(values({ start_date }))).toEqual({
         start_date: PROJECT_FIELD_MESSAGES.dateInvalid,
       });
     },
   );
+
+  it.each([
+    ["start_date", "1899-12-31"],
+    ["start_date", "2101-01-01"],
+    ["end_date", "2101-01-01"],
+  ] as const)("PRJ-1: rejects the %s %j as out of range", (field, date) => {
+    expect(fieldErrors(values({ [field]: date }))).toEqual({
+      [field]: PROJECT_FIELD_MESSAGES.dateOutOfRange,
+    });
+  });
+
+  it("PRJ-1: the out-of-range message names the range as DD/MM/YYYY", () => {
+    expect(PROJECT_FIELD_MESSAGES.dateOutOfRange).toBe(
+      "יש להזין תאריך בין 01/01/1900 ל-31/12/2100.",
+    );
+  });
 
   it("PRJ-1: accepts an end date equal to the start date", () => {
     expect(

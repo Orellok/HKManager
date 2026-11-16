@@ -1,4 +1,10 @@
-import { isIsoDate, isIsoDateInRange } from "@/lib/dates";
+import {
+  MAX_ISO_DATE,
+  MIN_ISO_DATE,
+  formatIsoDate,
+  isIsoDate,
+  isIsoDateInRange,
+} from "@/lib/dates";
 import {
   emptyToNull,
   readFormValues,
@@ -46,16 +52,19 @@ export const PROJECT_FIELD_MESSAGES = {
   propertyAddressTooLong: `כתובת הנכס ארוכה מדי (עד ${PROJECT_TEXT_MAX_LENGTH.property_address} תווים).`,
   statusRequired: "יש לבחור סטטוס.",
   amountInvalid: "יש להזין סכום בספרות, למשל 12,500 או 12,500.50.",
+  amountLatinDigits: "יש להזין את הסכום בספרות 0–9 בלבד.",
   amountTooManyDecimals: "אפשר להזין עד שתי ספרות אחרי הנקודה (אגורות).",
   amountNegative: "הסכום לא יכול להיות שלילי.",
   amountTooLarge: `הסכום גדול מדי (עד ${formatAgorot(MAX_AGOROT)}).`,
   dateInvalid: "יש להזין תאריך תקין.",
+  dateOutOfRange: `יש להזין תאריך בין ${formatIsoDate(MIN_ISO_DATE)} ל-${formatIsoDate(MAX_ISO_DATE)}.`,
   endBeforeStart: "תאריך הסיום לא יכול להיות לפני תאריך ההתחלה.",
   notesTooLong: `ההערות ארוכות מדי (עד ${PROJECT_TEXT_MAX_LENGTH.notes} תווים).`,
 } as const;
 
 const AMOUNT_MESSAGES: Record<ShekelParseError, string> = {
   invalid: PROJECT_FIELD_MESSAGES.amountInvalid,
+  non_latin_digits: PROJECT_FIELD_MESSAGES.amountLatinDigits,
   too_many_decimals: PROJECT_FIELD_MESSAGES.amountTooManyDecimals,
   negative: PROJECT_FIELD_MESSAGES.amountNegative,
   too_large: PROJECT_FIELD_MESSAGES.amountTooLarge,
@@ -73,8 +82,12 @@ function optionalText(maxLength: number, tooLong: string) {
 const optionalDate = z
   .string()
   .trim()
-  .refine((value) => value === "" || (isIsoDate(value) && isIsoDateInRange(value)), {
+  .refine((value) => value === "" || isIsoDate(value), {
     error: PROJECT_FIELD_MESSAGES.dateInvalid,
+    abort: true,
+  })
+  .refine((value) => value === "" || isIsoDateInRange(value), {
+    error: PROJECT_FIELD_MESSAGES.dateOutOfRange,
   })
   .transform(emptyToNull);
 

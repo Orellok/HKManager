@@ -172,6 +172,77 @@ test_.describe("PRJ-1: create and edit", () => {
   );
 
   test_(
+    "PRJ-1: a partly typed start date is reported, not saved without the date",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `תאריך חלקי ${token}` });
+      await page.goto("/projects/new");
+      await clientSelect(page).selectOption({ label: `תאריך חלקי ${token}` });
+      await nameField(page).fill(`תאריך חלקי ${token}`);
+      const start = page.getByLabel("תאריך התחלה");
+      // Day and month only; the year stays empty.
+      await start.click();
+      await page.keyboard.type("1611");
+      expect(await start.evaluate((input: HTMLInputElement) => input.validity.badInput)).toBe(true);
+
+      await page.getByRole("button", { name: "שמירת פרויקט" }).click();
+
+      await expect(start).toHaveAccessibleDescription("יש להזין תאריך תקין.");
+      await expect(start).toBeFocused();
+      await expect(page).toHaveURL(/\/projects\/new$/);
+      await expect(nameField(page)).toHaveValue(`תאריך חלקי ${token}`);
+      expect(await start.evaluate((input: HTMLInputElement) => input.validity.badInput)).toBe(true);
+      expect(await projectIdsNamed(`תאריך חלקי ${token}`)).toEqual([]);
+    },
+  );
+
+  test_(
+    "PRJ-1: clearing part of an existing date on edit is reported and keeps the date",
+    async ({ page, token, seedClient, seedProject }) => {
+      const clientId = await seedClient({ name: `עריכת תאריך ${token}` });
+      const id = await seedProject({
+        client_id: clientId,
+        name: `עריכת תאריך ${token}`,
+        start_date: "2026-11-16",
+        end_date: "2026-12-31",
+      });
+      await page.goto(`/projects/${id}/edit`);
+      const end = page.getByLabel("תאריך סיום");
+      await end.click();
+      await page.keyboard.press("Backspace");
+      expect(await end.evaluate((input: HTMLInputElement) => input.validity.badInput)).toBe(true);
+
+      await page.getByRole("button", { name: "שמירת שינויים" }).click();
+
+      await expect(end).toHaveAccessibleDescription("יש להזין תאריך תקין.");
+      await expect(end).toBeFocused();
+      await expect(page).toHaveURL(new RegExp(`/projects/${id}/edit$`));
+      expect(await readProject(id)).toMatchObject({
+        start_date: "2026-11-16",
+        end_date: "2026-12-31",
+      });
+    },
+  );
+
+  test_(
+    "PRJ-1: a date outside 1900-2100 gets the range message",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `טווח ${token}` });
+      await page.goto("/projects/new");
+      await clientSelect(page).selectOption({ label: `טווח ${token}` });
+      await nameField(page).fill(`טווח ${token}`);
+      await page.getByLabel("תאריך התחלה").fill("1899-12-31");
+
+      await page.getByRole("button", { name: "שמירת פרויקט" }).click();
+
+      await expect(page.getByLabel("תאריך התחלה")).toHaveAccessibleDescription(
+        "יש להזין תאריך בין 01/01/1900 ל-31/12/2100.",
+      );
+      await expect(page.getByLabel("תאריך התחלה")).toBeFocused();
+      expect(await projectIdsNamed(`טווח ${token}`)).toEqual([]);
+    },
+  );
+
+  test_(
     "PRJ-1: the Server Action validates and keeps the input when the browser does not",
     async ({ browser, context: signedInContext, baseURL, token, seedClient }) => {
       await seedClient({ name: `ללא JS ${token}` });

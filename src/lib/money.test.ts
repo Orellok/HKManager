@@ -66,7 +66,11 @@ describe("parseShekelsToAgorot", () => {
     ["+5", "invalid"],
     ["NaN", "invalid"],
     ["Infinity", "invalid"],
-    ["١٢٣", "invalid"],
+    ["١٢٣", "non_latin_digits"],
+    ["１２３", "non_latin_digits"],
+    ["1٢3", "non_latin_digits"],
+    ["-١", "non_latin_digits"],
+    ["₪ ١٢,٥٠٠", "non_latin_digits"],
   ])("PRJ-1: %j is rejected as %s", (input, error) => {
     expect(parseShekelsToAgorot(input)).toEqual({ ok: false, error });
   });

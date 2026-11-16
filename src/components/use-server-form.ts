@@ -22,6 +22,11 @@ type UseServerFormOptions<Field extends string> = {
   fields: readonly Field[];
   read: (formData: FormData) => Record<Field, string>;
   validate: (values: Record<Field, string>) => ValidationResult<Field, unknown>;
+  /**
+   * Errors only the browser can see, e.g. a partly typed date that a date input submits as
+   * "" (validity.badInput). Reported with the schema errors, and override them.
+   */
+  checkControls?: (form: HTMLFormElement) => FieldErrors<Field>;
 };
 
 function focusField(form: HTMLFormElement | null, field: string | undefined) {
@@ -43,6 +48,7 @@ export function useServerForm<Field extends string>({
   fields,
   read,
   validate,
+  checkControls,
 }: UseServerFormOptions<Field>) {
   // Without JavaScript (or before hydration) the form posts to the Server Action itself and
   // this state holds its answer. With JavaScript, handleSubmit validates in the browser and
@@ -77,9 +83,14 @@ export function useServerForm<Field extends string>({
       return;
     }
     const validation = validate(values);
-    if (!validation.success) {
-      setBrowserErrors(validation.fieldErrors);
-      focusField(form, firstInvalidField(fields, validation.fieldErrors));
+    const controlErrors = checkControls?.(form) ?? {};
+    if (!validation.success || firstInvalidField(fields, controlErrors)) {
+      const fieldErrors = {
+        ...(validation.success ? {} : validation.fieldErrors),
+        ...controlErrors,
+      };
+      setBrowserErrors(fieldErrors);
+      focusField(form, firstInvalidField(fields, fieldErrors));
       return;
     }
     startSave(async () => {

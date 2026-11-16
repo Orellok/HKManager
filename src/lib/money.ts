@@ -18,10 +18,16 @@ const SHEKEL_PATTERN = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?$/;
 /** A currency sign the user may type or paste before or after the number. */
 const SHEKEL_SIGN_PATTERN = /^₪\s*|\s*₪$/g;
 const MINUS_PATTERN = /^[-−]/;
+/**
+ * A decimal digit of another script (Arabic-Indic "١٢٣", full-width "１２３"). Rejected, but
+ * with its own message. Built with RegExp: the \p{} escape needs the ES2018 target.
+ */
+const NON_LATIN_DIGIT_PATTERN = new RegExp("(?![0-9])\\p{Nd}", "u");
 /** More digits than this cannot be at most MAX_AGOROT; checked before converting to a number. */
 const MAX_AGOROT_DIGITS = String(MAX_AGOROT).length;
 
-export type ShekelParseError = "invalid" | "too_many_decimals" | "negative" | "too_large";
+export type ShekelParseError =
+  "invalid" | "non_latin_digits" | "too_many_decimals" | "negative" | "too_large";
 
 export type ShekelParseResult =
   { ok: true; agorot: number } | { ok: false; error: ShekelParseError };
@@ -33,6 +39,9 @@ export type ShekelParseResult =
  */
 export function parseShekelsToAgorot(input: string): ShekelParseResult {
   const text = input.trim().replace(SHEKEL_SIGN_PATTERN, "");
+  if (NON_LATIN_DIGIT_PATTERN.test(text)) {
+    return { ok: false, error: "non_latin_digits" };
+  }
   if (MINUS_PATTERN.test(text)) {
     return { ok: false, error: "negative" };
   }

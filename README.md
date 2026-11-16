@@ -90,11 +90,14 @@ commit SHA, and every workflow runs with read-only repository permissions.
 
 - Node 22 and the pnpm version from `package.json` are used everywhere. The Supabase CLI comes
   from the devDependency (`pnpm exec supabase`), so CI and the migrations use one CLI version.
-- The migrations workflows use a concurrency group per environment: two runs never push to the
-  same database at the same time; a second run waits instead of being cancelled.
+- The migrations workflows use a concurrency group per environment: runs never overlap; a newer
+  queued run replaces an older queued one.
+- The staging workflow skips the migrate job when the commit is no longer the head of `main`
+  (the newer commit's run applies every pending migration). A skipped job never counts as a
+  successful staging migration.
 - The production guard reads the staging runs through the Actions API (`actions: read`). Each
-  staging run is titled `Staging migrations <commit SHA>`, and the guard looks for a successful
-  run with that exact title.
+  staging run is titled `Staging migrations <commit SHA>`, and the guard requires a run with that
+  exact title whose `Apply migrations to staging` job succeeded (not skipped).
 - `supabase db push` applies only the pending files in `supabase/migrations/` and records them
   in the project's migration history. It does not push the auth settings in
   `supabase/config.toml` (the before-user-created hook, providers, redirect URLs), which stay

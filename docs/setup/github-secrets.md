@@ -21,7 +21,7 @@
 2. תפריט החשבון (למעלה) → **Account preferences** → **Access Tokens** (כתובת ישירה: https://supabase.com/dashboard/account/tokens).
 3. **Generate new token**. שם: `hkmanager-github-actions`.
    - אם מוצעת בחירת תוקף (expiry) – לבחור תוקף, ולרשום ביומן תזכורת לחדש אותו לפני שיפוג. כשהטוקן פג, ה-workflows ייכשלו עם שגיאת הרשאה עד שיוגדר טוקן חדש.
-   - אם מוצעת בחירת הרשאות (scoped token) – לפי ה-CLI נדרשות: `projects_read`, `project_admin_read`, `database_pooling_config_read`, `database_write`. אם אין בחירה כזו – הטוקן מקבל גישה לכל הפרויקטים בחשבון, ולכן יש לשמור עליו כמו על סיסמה.
+   - אם מוצעת בחירת הרשאות (scoped token) – לפי ה-CLI נדרשות: `projects_read`, `project_admin_read`, `database_pooling_config_read`. ההרשאה `database_write` כנראה אינה נדרשת, כי סיסמת ה-DB מועברת ל-CLI דרך `SUPABASE_DB_PASSWORD`; היא נדרשת רק לחיבור בלי סיסמה. האפשרות הבטוחה היא לכלול גם אותה; אם משמיטים אותה וה-workflow נכשל בשגיאת הרשאה – להוסיף אותה. אם אין בחירה כזו – הטוקן מקבל גישה לכל הפרויקטים בחשבון, ולכן יש לשמור עליו כמו על סיסמה.
 4. להעתיק את הטוקן. **הוא מוצג פעם אחת בלבד.** להדביק אותו ישר ב-GitHub (סעיף 3), ולא לשמור אותו בקובץ.
 
 ## 2. סיסמת מסד הנתונים של כל פרויקט

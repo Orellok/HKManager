@@ -28,14 +28,14 @@ Commit and push after every meaningful step.
 | M1.1 Clients | DONE – review APPROVED, QA PASS, 3 fix rounds (duplicate notice; action errors/focus/CSP/CRLF; expired session) | docs/specs/m1-1-clients.md |
 | M1.2 Projects | DONE – review APPROVED, QA PASS, 2 fix rounds (polish: session 4xx rule, filter queue, date min/max; minor: partial date, range/digit messages) | docs/specs/m1-2-projects.md |
 | M1.3 Milestones + open debts | DONE – review APPROVED, QA PASS, 1 polish round (sort_order bound, server-side move result, test robustness) | docs/specs/m1-3-milestones.md | docs/specs/m1-3-milestones.md |
-| M2.1 Incomes + payments | round 1 fixes verified; re-review CHANGES_REQUIRED (E2E hydration race in incomes list test) – fix round 2 | docs/specs/m2-1-incomes.md |
+| M2.1 Incomes + payments | fix round 2 done (026f0cb, 6c932b2) – in re-review | docs/specs/m2-1-incomes.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run); (5) Netlify account + 2 sites + NETLIFY_AUTH_TOKEN (docs/setup/netlify.md).
 VERIFY-02 checked 2026-11-16 (docs/verify/VERIFY-02-netlify.md): commercial use OK, Next 16 supported; OPEN: proxy.ts (Node runtime) on Netlify – gate on first staging deploy; credit budget (hard pause).
 Owner approved (2026-11-16): start M1 in parallel; split M1.1 Clients (CLI-1..4), M1.2 Projects (PRJ-1..3), M1.3 Milestones (MS-1..3, MS-6); MS-4/5 move to M2. M0.5 Sentry / M0.6 Netlify wait for owner accounts.
-M1.3 PR Orellok/HKManager#5 merged by owner. Now: M2.1 fix round 2 (wait for hydration before filling filters in incomes E2E; prevent pre-hydration month input reset for users). Then re-review, QA, PR.
+M1.3 PR Orellok/HKManager#5 merged by owner. Now: re-review M2.1 fix round 2 (diff 239b716..HEAD), then QA, then PR. Fix rounds used: 2 of 3.
 Carry into M2: (1) deleting the last milestone loses focus + announcement (live region inside MilestoneList unmounts); (2) shared RedirectNotice: ?notice= reappears after router refresh following an in-page Server Action (also in M1.2) – strip/consume notice robustly.
 Lesson: do not run reviewer and QA E2E suites in parallel – they share the local Supabase stack and test users (5 false failures). Carry: debts paging E2E should seed at 1900-01-01 to be order-independent. Owner to confirm M1.3 copy + deviations (100 milestones/project, no warning with 0 milestones, past-due amount-0 = מתוכנן, 'חזרה' dismiss label, view without status column).
 Carry into M1.3: isIsoDate uses Date.UTC which maps years 0–99 to 1900s → years 0001–0099 get generic date message instead of range message (use setUTCFullYear). Lead decision: no-JS partial date saved as empty is acceptable (PWA on Chrome always runs JS). Owner to confirm M1.2 Hebrew copy + bounds. Lead concern: criterion 11(a) too narrow – invalid refresh token (AuthApiError 400) should count as 'ended'; only 429/5xx/network = 'unknown'.

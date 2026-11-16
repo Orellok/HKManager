@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { countFromDb } from "@/lib/db-numbers";
-import { agorotFromDb } from "@/lib/money";
+import { agorotFromDb, agorotTotalFromDb, balanceAgorotFromDb } from "@/lib/money";
 
 import type { MoveDirection } from "./reorder";
 import type { MilestoneInput } from "./schema";
@@ -12,7 +12,7 @@ import type { MilestoneInput } from "./schema";
  */
 
 const TABLE = "milestones";
-/** Milestones with paid and balance (SPEC 6); paid is 0 until incomes (M2). */
+/** Milestones with paid (their incomes that are not deleted) and balance (SPEC 6). */
 const BALANCES_VIEW = "milestone_balances";
 const BALANCE_COLUMNS =
   "id, project_id, description, amount, due_date, sort_order, cancelled_at, paid, balance";
@@ -35,9 +35,9 @@ export type Milestone = {
   due_date: string;
   sort_order: number;
   cancelled_at: string | null;
-  /** Agorot paid so far (0 until M2). */
+  /** Agorot paid so far (incomes that are not deleted). */
   paid: number;
-  /** Agorot left to pay. */
+  /** Agorot left to pay (amount − paid); negative when overpaid (MS-5). */
   balance: number;
 };
 
@@ -51,8 +51,8 @@ function toMilestone(row: MilestoneRow): Milestone {
   return {
     ...row,
     amount: agorotFromDb(row.amount) ?? 0,
-    paid: agorotFromDb(row.paid) ?? 0,
-    balance: agorotFromDb(row.balance) ?? 0,
+    paid: agorotTotalFromDb(row.paid),
+    balance: balanceAgorotFromDb(row.balance),
   };
 }
 
@@ -134,8 +134,8 @@ export async function updateMilestone(
 export type DeleteMilestoneResult = "deleted" | "not_found" | "referenced";
 
 /**
- * Owner decision (M1.3): permanently deletes a milestone. Incomes (M2) will reference
- * milestones, and the database will then refuse to delete one with payments.
+ * Owner decision (M1.3): permanently deletes a milestone. Incomes reference milestones (ON
+ * DELETE RESTRICT), so the database refuses to delete one with payments ("referenced").
  */
 export async function deleteMilestone(
   supabase: SupabaseClient,

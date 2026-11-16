@@ -137,3 +137,21 @@ export function agorotTotalFromDb(value: unknown): number {
   }
   return agorot;
 }
+
+/**
+ * A balance read from the database (amount − paid). Negative when more was paid than the
+ * amount (MS-5 allows an overpayment after confirmation). Must be a safe integer: a larger
+ * value would have lost precision in JSON and is rejected rather than shown wrong.
+ */
+export function balanceAgorotFromDb(value: unknown): number {
+  const agorot =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^-?\d+$/.test(value)
+        ? Number(value)
+        : NaN;
+  if (!Number.isSafeInteger(agorot)) {
+    throw new RangeError("The database returned a balance outside the supported range");
+  }
+  return agorot;
+}

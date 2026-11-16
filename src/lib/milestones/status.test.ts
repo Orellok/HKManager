@@ -5,7 +5,7 @@ import { todayInJerusalem } from "@/lib/dates";
 import { MILESTONE_STATUS_LABELS, milestoneStatus, type MilestoneStatusInput } from "./status";
 
 function milestone(fields: Partial<MilestoneStatusInput> = {}): MilestoneStatusInput {
-  return { due_date: "2026-11-16", cancelled_at: null, balance: 100_000, ...fields };
+  return { due_date: "2026-11-16", cancelled_at: null, paid: 0, balance: 100_000, ...fields };
 }
 
 describe("milestoneStatus", () => {
@@ -77,7 +77,69 @@ describe("milestoneStatus", () => {
     expect(MILESTONE_STATUS_LABELS).toEqual({
       planned: "מתוכנן",
       due: "לתשלום",
+      partially_paid: "שולם חלקית",
+      paid: "שולם",
       cancelled: "בוטל",
     });
+  });
+});
+
+describe("milestoneStatus with payments", () => {
+  it("MS-2: part paid before the due date is partially_paid", () => {
+    expect(
+      milestoneStatus(
+        milestone({ due_date: "2026-12-01", paid: 40_000, balance: 60_000 }),
+        "2026-11-16",
+      ),
+    ).toBe("partially_paid");
+  });
+
+  it("MS-2: part paid on the due date itself is still partially_paid", () => {
+    expect(
+      milestoneStatus(
+        milestone({ due_date: "2026-11-16", paid: 1, balance: 99_999 }),
+        "2026-11-16",
+      ),
+    ).toBe("partially_paid");
+  });
+
+  it("MS-2: part paid after the due date passed is due (the rest is overdue)", () => {
+    expect(
+      milestoneStatus(
+        milestone({ due_date: "2026-11-15", paid: 40_000, balance: 60_000 }),
+        "2026-11-16",
+      ),
+    ).toBe("due");
+  });
+
+  it.each(["2026-11-01", "2026-11-16", "2026-12-01"])(
+    "MS-2: fully paid, due %s, is paid",
+    (due_date) => {
+      expect(
+        milestoneStatus(milestone({ due_date, paid: 100_000, balance: 0 }), "2026-11-16"),
+      ).toBe("paid");
+    },
+  );
+
+  it("MS-2 / MS-5: an overpaid milestone (negative balance) is paid", () => {
+    expect(
+      milestoneStatus(
+        milestone({ due_date: "2026-11-01", paid: 150_000, balance: -50_000 }),
+        "2026-11-16",
+      ),
+    ).toBe("paid");
+  });
+
+  it("MS-2: a payment on a milestone of amount 0 makes it paid", () => {
+    expect(milestoneStatus(milestone({ paid: 100, balance: -100 }), "2026-11-16")).toBe("paid");
+  });
+
+  it("MS-2: a cancelled milestone stays cancelled whatever was paid", () => {
+    expect(
+      milestoneStatus(
+        milestone({ cancelled_at: "2026-11-10T10:00:00Z", paid: 100_000, balance: 0 }),
+        "2026-11-16",
+      ),
+    ).toBe("cancelled");
   });
 });

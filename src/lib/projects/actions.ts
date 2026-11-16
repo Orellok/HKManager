@@ -46,6 +46,7 @@ const MESSAGES = {
   saveFailed: "השמירה נכשלה. הפרטים לא נשמרו, אפשר לנסות שוב.",
   notFound: "הפרויקט לא נמצא. ייתכן שנמחק.",
   clientMissing: "הלקוח לא נמצא. ייתכן שנמחק. יש לבחור לקוח אחר.",
+  clientHasIncomes: "לפרויקט נרשמו הכנסות של הלקוח הנוכחי, ולכן אי אפשר להעביר אותו ללקוח אחר.",
   archived: "הפרויקט הועבר לארכיון.",
   restored: "הפרויקט הוחזר מהארכיון.",
   statusFailed: "הפעולה נכשלה. אפשר לנסות שוב.",
@@ -57,10 +58,11 @@ function refusedState(values: ProjectFormValues, refusal: ClientRefusal): Projec
   return {
     values,
     fieldErrors: {
-      client_id:
-        refusal === "client_archived"
-          ? PROJECT_FIELD_MESSAGES.clientArchived
-          : MESSAGES.clientMissing,
+      client_id: {
+        client_archived: PROJECT_FIELD_MESSAGES.clientArchived,
+        client_missing: MESSAGES.clientMissing,
+        client_has_incomes: MESSAGES.clientHasIncomes,
+      }[refusal],
     },
     formError: null,
   };

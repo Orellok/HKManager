@@ -4,6 +4,7 @@ import {
   MAX_AGOROT,
   agorotFromDb,
   agorotTotalFromDb,
+  balanceAgorotFromDb,
   agorotToShekelInput,
   formatAgorot,
   parseShekelsToAgorot,
@@ -157,6 +158,25 @@ describe("agorotTotalFromDb", () => {
     "MS-6: rejects the total %j",
     (value) => {
       expect(() => agorotTotalFromDb(value)).toThrow(RangeError);
+    },
+  );
+});
+
+describe("balanceAgorotFromDb", () => {
+  it.each([
+    [0, 0],
+    [125_050, 125_050],
+    [-50_000, -50_000],
+    ["-123456789012", -123_456_789_012],
+    [Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER],
+  ])("MS-2: reads the balance %j as %i agorot (negative when overpaid)", (value, agorot) => {
+    expect(balanceAgorotFromDb(value)).toBe(agorot);
+  });
+
+  it.each([null, undefined, 1.5, "1.5", "-", "abc", Number.MAX_SAFE_INTEGER + 1])(
+    "MS-2: rejects the balance %j",
+    (value) => {
+      expect(() => balanceAgorotFromDb(value)).toThrow(RangeError);
     },
   );
 });

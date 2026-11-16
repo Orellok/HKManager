@@ -33,3 +33,47 @@ export function summarizeMilestoneTotals(
     ? { total, comparison: { kind: "above", difference: total - contractAmount } }
     : { total, comparison: { kind: "below", difference: contractAmount - total } };
 }
+
+export type MilestonePayment = { paid: number; balance: number; cancelled_at: string | null };
+
+export type MilestonePaymentTotals = {
+  /** Agorot paid on the project's milestones, cancelled ones included (money received). */
+  paid: number;
+  /**
+   * Agorot still to pay: the positive balances of the non-cancelled milestones. An overpaid
+   * milestone does not reduce another milestone's balance.
+   */
+  openBalance: number;
+};
+
+/** MS-2 / PRJ-3: what was paid on a project's milestones and what is left to pay. */
+export function summarizeMilestonePayments(
+  milestones: readonly MilestonePayment[],
+): MilestonePaymentTotals {
+  let paid = 0;
+  let openBalance = 0;
+  for (const milestone of milestones) {
+    paid += milestone.paid;
+    if (milestone.cancelled_at === null && milestone.balance > 0) {
+      openBalance += milestone.balance;
+    }
+  }
+  return { paid, openBalance };
+}
+
+export type ProjectBalance =
+  | { kind: "no_contract" }
+  | { kind: "open"; balance: number }
+  | { kind: "overpaid"; excess: number };
+
+/**
+ * PRJ-3: the project's balance, contract amount − paid, when a contract amount is set.
+ * More paid than the contract is shown as an excess, never as a negative amount.
+ */
+export function projectBalance(contractAmount: number | null, paid: number): ProjectBalance {
+  if (contractAmount === null) {
+    return { kind: "no_contract" };
+  }
+  const balance = contractAmount - paid;
+  return balance >= 0 ? { kind: "open", balance } : { kind: "overpaid", excess: -balance };
+}

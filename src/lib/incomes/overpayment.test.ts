@@ -23,28 +23,44 @@ describe("isOverpayment", () => {
 });
 
 describe("overpayment confirmation token", () => {
-  it("MS-5: round-trips the balance (also negative) and the amount", () => {
+  const MILESTONE = "5b4d0e3a-2c6f-4a01-9d8c-3e4f5a6b7c8d";
+  const OTHER = "6c5e1f4b-3d70-4b12-8e9d-4f5a6b7c8d9e";
+
+  it("MS-5: round-trips the milestone, the balance (also negative) and the amount", () => {
     for (const confirmation of [
-      { balance: 50_000, amount: 60_000 },
-      { balance: 0, amount: 1 },
-      { balance: -25_050, amount: 9_999_999_999 },
+      { milestoneId: MILESTONE, balance: 50_000, amount: 60_000 },
+      { milestoneId: MILESTONE, balance: 0, amount: 1 },
+      { milestoneId: OTHER, balance: -25_050, amount: 9_999_999_999 },
     ]) {
       expect(parseOverpaymentToken(overpaymentToken(confirmation))).toEqual(confirmation);
     }
   });
 
-  it.each([null, undefined, "", "abc", "1", "1:", ":1", "1:-1", "1.5:2", "1:2:3", 12])(
-    "MS-5: a malformed token %j is no confirmation",
-    (value) => {
-      expect(parseOverpaymentToken(value)).toBeNull();
-    },
-  );
+  it.each([
+    null,
+    undefined,
+    "",
+    "abc",
+    "1:2",
+    `${MILESTONE}:1`,
+    `${MILESTONE}:1:-1`,
+    `${MILESTONE}:1.5:2`,
+    `not-a-uuid:1:2`,
+    `${MILESTONE}:1:2:3`,
+    12,
+  ])("MS-5: a malformed token %j is no confirmation", (value) => {
+    expect(parseOverpaymentToken(value)).toBeNull();
+  });
 
-  it("MS-5: a confirmation counts only for the amount it was given for", () => {
-    const token = { balance: 50_000, amount: 60_000 };
-    expect(confirmedBalanceFor(token, 60_000)).toBe(50_000);
-    expect(confirmedBalanceFor(token, 70_000)).toBeNull();
-    expect(confirmedBalanceFor(null, 60_000)).toBeNull();
+  it("MS-5: a confirmation counts only for the milestone and the amount it was given for", () => {
+    const token = { milestoneId: MILESTONE, balance: 50_000, amount: 60_000 };
+    expect(confirmedBalanceFor(token, MILESTONE, 60_000)).toBe(50_000);
+    expect(confirmedBalanceFor(token, MILESTONE.toUpperCase(), 60_000)).toBe(50_000);
+    expect(confirmedBalanceFor(token, MILESTONE, 70_000)).toBeNull();
+    // Warned on one milestone, confirmed for another with the same balance: asked again.
+    expect(confirmedBalanceFor(token, OTHER, 60_000)).toBeNull();
+    expect(confirmedBalanceFor(token, null, 60_000)).toBeNull();
+    expect(confirmedBalanceFor(null, MILESTONE, 60_000)).toBeNull();
   });
 });
 

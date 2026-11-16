@@ -81,7 +81,9 @@ function milestoneLabel(milestone: MilestoneChoice, projectName?: string): strin
  * Choosing a client loads its projects and milestones; choosing a project limits the
  * milestones to its own; choosing a milestone also chooses its project (and, for a new
  * income, fills the amount with the milestone's balance). A payment above the balance comes
- * back with a warning and an explicit confirm button (MS-5).
+ * back with a warning and an explicit confirm button (MS-5). The confirm button comes after
+ * the save button in the form, so Enter in a field (which submits with the first submit
+ * button) never confirms; and changing any field withdraws the warning.
  */
 export function IncomeForm({
   action,
@@ -94,15 +96,24 @@ export function IncomeForm({
   submitLabel,
   cancelHref,
 }: IncomeFormProps) {
-  const { formRef, formAction, handleSubmit, values, errors, formMessage, confirmation, pending } =
-    useServerForm({
-      action,
-      initialValues,
-      fields: INCOME_FIELDS,
-      read: readIncomeFormValues,
-      validate: validateForToday,
-      checkControls: checkReceivedDateInput,
-    });
+  const {
+    formRef,
+    formAction,
+    handleSubmit,
+    values,
+    errors,
+    formMessage,
+    confirmation,
+    dismissConfirmation,
+    pending,
+  } = useServerForm({
+    action,
+    initialValues,
+    fields: INCOME_FIELDS,
+    read: readIncomeFormValues,
+    validate: validateForToday,
+    checkControls: checkReceivedDateInput,
+  });
   const [clientId, setClientId] = useState(initialValues.client_id);
   const [projectId, setProjectId] = useState(initialValues.project_id);
   const [milestoneId, setMilestoneId] = useState(initialValues.milestone_id);
@@ -216,6 +227,9 @@ export function IncomeForm({
       ref={formRef}
       action={formAction}
       onSubmit={handleSubmit}
+      // MS-5: a warning holds for the values it was about; any change withdraws it, so the
+      // next save checks the balance again.
+      onChange={dismissConfirmation}
       noValidate
       className="max-w-xl space-y-5"
     >
@@ -300,6 +314,14 @@ export function IncomeForm({
         error={errors.notes}
       />
 
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" variant={confirmation ? "secondary" : "primary"} pending={pending}>
+          {pending ? "שומר…" : submitLabel}
+        </Button>
+        <Link href={cancelHref} className={buttonClasses("secondary")}>
+          ביטול
+        </Link>
+      </div>
       {confirmation ? (
         <div
           ref={confirmationRef}
@@ -320,15 +342,6 @@ export function IncomeForm({
           </Button>
         </div>
       ) : null}
-
-      <div className="flex flex-wrap gap-3">
-        <Button type="submit" variant={confirmation ? "secondary" : "primary"} pending={pending}>
-          {pending ? "שומר…" : submitLabel}
-        </Button>
-        <Link href={cancelHref} className={buttonClasses("secondary")}>
-          ביטול
-        </Link>
-      </div>
     </form>
   );
 }

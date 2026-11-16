@@ -25,6 +25,19 @@ export const INCOMES_PAGE_SIZE = 50;
 export const PROJECT_INCOMES_LIMIT = 500;
 /** Projects of a client offered in the income form, by name. */
 export const PROJECT_CHOICES_LIMIT = 100;
+/**
+ * PostgREST returns at most this many rows per request (max_rows in supabase/config.toml)
+ * and drops the rest without an error.
+ */
+const MAX_ROWS_PER_REQUEST = 1000;
+/**
+ * Projects whose milestones are read in one request: a project holds at most
+ * MAX_MILESTONES_PER_PROJECT milestones (the database refuses more, HKM01), so one request
+ * can never reach MAX_ROWS_PER_REQUEST and be cut short.
+ */
+const PROJECTS_PER_MILESTONE_REQUEST = Math.floor(
+  MAX_ROWS_PER_REQUEST / MAX_MILESTONES_PER_PROJECT,
+);
 
 /** Postgres foreign_key_violation: the client, project or milestone no longer exists. */
 const FOREIGN_KEY_VIOLATION = "23503";
@@ -370,40 +383,20 @@ export async function listIncomeChoices(
   }
 
   const milestonesByProject = new Map<string, MilestoneChoice[]>();
-  if (projects.length > 0) {
-    const milestones = await supabase
-      .from("milestone_balances")
-      .select("id, project_id, description, balance, cancelled_at")
-      .in(
-        "project_id",
-        projects.map((project) => project.id),
-      )
-      .order("project_id")
-      .order("sort_order")
-      .limit(projects.length * MAX_MILESTONES_PER_PROJECT);
-    if (milestones.error) {
-      throw new Error("Could not list milestones for the income form", {
-        cause: milestones.error,
-      });
+  for (const row of await listChoiceMilestones(
+    supabase,
+    projects.map((project) => project.id),
+  )) {
+    if (row.cancelled_at !== null && row.id !== selected.milestoneId) {
+      continue;
     }
-    for (const row of milestones.data as {
-      id: string;
-      project_id: string;
-      description: string;
-      balance: unknown;
-      cancelled_at: string | null;
-    }[]) {
-      if (row.cancelled_at !== null && row.id !== selected.milestoneId) {
-        continue;
-      }
-      const list = milestonesByProject.get(row.project_id) ?? [];
-      list.push({
-        id: row.id,
-        description: row.description,
-        balance: balanceAgorotFromDb(row.balance),
-      });
-      milestonesByProject.set(row.project_id, list);
-    }
+    const list = milestonesByProject.get(row.project_id) ?? [];
+    list.push({
+      id: row.id,
+      description: row.description,
+      balance: balanceAgorotFromDb(row.balance),
+    });
+    milestonesByProject.set(row.project_id, list);
   }
 
   return {
@@ -415,4 +408,44 @@ export async function listIncomeChoices(
     })),
     hasMoreProjects: rows.length > PROJECT_CHOICES_LIMIT,
   };
+}
+
+type ChoiceMilestoneRow = {
+  id: string;
+  project_id: string;
+  description: string;
+  balance: unknown;
+  cancelled_at: string | null;
+};
+
+/**
+ * The milestones of the given projects, in their order. Read in requests of at most
+ * PROJECTS_PER_MILESTONE_REQUEST projects, sent together, so no answer can be truncated by
+ * PostgREST's row limit (at most PROJECT_CHOICES_LIMIT + 1 projects: 11 requests).
+ */
+async function listChoiceMilestones(
+  supabase: SupabaseClient,
+  projectIds: readonly string[],
+): Promise<ChoiceMilestoneRow[]> {
+  const chunks: string[][] = [];
+  for (let start = 0; start < projectIds.length; start += PROJECTS_PER_MILESTONE_REQUEST) {
+    chunks.push(projectIds.slice(start, start + PROJECTS_PER_MILESTONE_REQUEST));
+  }
+  const answers = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from("milestone_balances")
+        .select("id, project_id, description, balance, cancelled_at")
+        .in("project_id", chunk)
+        .order("project_id")
+        .order("sort_order")
+        .limit(chunk.length * MAX_MILESTONES_PER_PROJECT),
+    ),
+  );
+  return answers.flatMap(({ data, error }) => {
+    if (error) {
+      throw new Error("Could not list milestones for the income form", { cause: error });
+    }
+    return data as ChoiceMilestoneRow[];
+  });
 }

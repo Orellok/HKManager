@@ -73,6 +73,13 @@ export function useServerForm<Field extends string>({
     focusField(formRef.current, firstInvalidField(fields, state.fieldErrors));
   }, [state, fields]);
 
+  /** Withdraws a pending save confirmation (e.g. after the user changed a field). */
+  function dismissConfirmation() {
+    if (state.confirmation) {
+      setBrowserState({ ...state, confirmation: undefined });
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     // With JavaScript the save always runs here; the form action is the no-JavaScript path.
     event.preventDefault();
@@ -116,6 +123,7 @@ export function useServerForm<Field extends string>({
     errors,
     formMessage,
     confirmation: state.confirmation,
+    dismissConfirmation,
     pending,
   };
 }

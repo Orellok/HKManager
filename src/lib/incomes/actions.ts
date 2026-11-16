@@ -125,6 +125,7 @@ async function saveIncomeForm(
   const input = validation.data;
   const confirmedBalance = confirmedBalanceFor(
     parseOverpaymentToken(formData.get(OVERPAYMENT_CONFIRM_FIELD)),
+    input.milestone_id,
     input.amount,
   );
 
@@ -142,7 +143,14 @@ async function saveIncomeForm(
   }
   switch (result.status) {
     case "needs_confirmation": {
-      const warning = { balance: result.balance, amount: input.amount };
+      if (input.milestone_id === null) {
+        throw new Error("save_income asked to confirm a payment without a milestone");
+      }
+      const warning = {
+        milestoneId: input.milestone_id,
+        balance: result.balance,
+        amount: input.amount,
+      };
       return {
         values,
         fieldErrors: {},

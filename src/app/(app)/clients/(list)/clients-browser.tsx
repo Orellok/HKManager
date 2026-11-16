@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 
 import { Button, buttonClasses } from "@/components/button";
-import { searchClientsAction } from "@/lib/clients/actions";
+import { searchClientsAction, type SearchClientsResult } from "@/lib/clients/actions";
 import { NEW_CLIENT_PATH, clientPath } from "@/lib/clients/paths";
 import type { ClientListPage, ClientListView } from "@/lib/clients/queries";
 import { CLIENT_SEARCH_QUERY_MAX_LENGTH } from "@/lib/clients/schema";
@@ -48,11 +48,32 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
   const [searchPending, startSearch] = useTransition();
   const [morePending, startLoadMore] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  /** Index of the first item of a just-loaded last page, to move focus to once rendered. */
+  const focusItemAfterLoad = useRef<number | null>(null);
+  const busy = searchPending || morePending;
+
+  // The "load more" button disappears with the last page; keyboard focus moves to the first
+  // newly loaded client instead of falling back to <body>.
+  useEffect(() => {
+    const index = focusItemAfterLoad.current;
+    if (index === null) {
+      return;
+    }
+    focusItemAfterLoad.current = null;
+    listRef.current?.querySelectorAll<HTMLAnchorElement>("a")[index]?.focus();
+  }, [state.items]);
 
   function search(query: string) {
     setError(null);
     startSearch(async () => {
-      const result = await searchClientsAction({ view, query, offset: 0 });
+      let result: SearchClientsResult;
+      try {
+        result = await searchClientsAction({ view, query, offset: 0 });
+      } catch {
+        // The request failed (no connection, server error); the list stays as it was.
+        result = { ok: false };
+      }
       if (!result.ok) {
         setError(SEARCH_FAILED);
         return;
@@ -63,13 +84,16 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (morePending) {
+    if (busy) {
       return;
     }
     search(inputRef.current?.value.trim() ?? "");
   }
 
   function clearSearch() {
+    if (busy) {
+      return;
+    }
     if (inputRef.current) {
       inputRef.current.value = "";
       inputRef.current.focus();
@@ -78,15 +102,27 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
   }
 
   function loadMore() {
+    if (busy) {
+      return;
+    }
     setError(null);
     const request = { query: state.query, offset: state.items.length };
     startLoadMore(async () => {
-      const result = await searchClientsAction({ view, ...request });
+      let result: SearchClientsResult;
+      try {
+        result = await searchClientsAction({ view, ...request });
+      } catch {
+        result = { ok: false };
+      }
       if (!result.ok) {
         setError(LOAD_MORE_FAILED);
         return;
       }
-      setState((previous) => appendPage(previous, request, result.page));
+      const page = result.page;
+      if (!page.hasMore && page.items.length > 0) {
+        focusItemAfterLoad.current = request.offset;
+      }
+      setState((previous) => appendPage(previous, request, page));
     });
   }
 
@@ -109,15 +145,11 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
             enterKeyHint="search"
             className="border-input bg-background min-h-11 min-w-0 flex-1 basis-48 rounded-md border px-3 text-base"
           />
-          <Button type="submit" disabled={searchPending || morePending} aria-busy={searchPending}>
+          <Button type="submit" pending={busy}>
             {searchPending ? "מחפש…" : "חיפוש"}
           </Button>
           {isSearchActive ? (
-            <Button
-              variant="secondary"
-              onClick={clearSearch}
-              disabled={searchPending || morePending}
-            >
+            <Button variant="secondary" onClick={clearSearch} pending={busy}>
               ניקוי החיפוש
             </Button>
           ) : null}
@@ -135,6 +167,7 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
         <EmptyList view={view} isSearchActive={isSearchActive} />
       ) : (
         <ul
+          ref={listRef}
           aria-label="רשימת הלקוחות"
           aria-busy={searchPending}
           className="divide-y rounded-lg border"
@@ -158,12 +191,7 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
       )}
 
       {state.hasMore ? (
-        <Button
-          variant="secondary"
-          onClick={loadMore}
-          disabled={morePending || searchPending}
-          aria-busy={morePending}
-        >
+        <Button variant="secondary" onClick={loadMore} pending={busy}>
           {morePending ? "טוען…" : "הצגת לקוחות נוספים"}
         </Button>
       ) : null}

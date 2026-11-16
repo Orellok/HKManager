@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 
 import { Button, buttonClasses } from "@/components/button";
 import { TextInputField, TextareaField } from "@/components/form-field";
-import { findDuplicateClientsAction, type ClientFormState } from "@/lib/clients/actions";
+import {
+  findDuplicateClientsAction,
+  type ClientFormState,
+  type DuplicateClientsResult,
+} from "@/lib/clients/actions";
 import { duplicateNameKey, isSameClientName } from "@/lib/clients/duplicate-name";
 import type { DuplicateClient } from "@/lib/clients/queries";
 import {
@@ -28,6 +33,7 @@ type ClientFormProps = {
 
 const DUPLICATE_WARNING_ID = "name-duplicate-warning";
 const FIX_FIELDS_MESSAGE = "לא ניתן לשמור. יש לתקן את השדות המסומנים.";
+const SAVE_UNAVAILABLE_MESSAGE = "לא ניתן לשמור כרגע. בדקו את החיבור ונסו שוב.";
 
 function firstInvalidField(errors: ClientFieldErrors): ClientField | undefined {
   return CLIENT_FIELDS.find((field) => errors[field]);
@@ -58,17 +64,23 @@ export function ClientForm({
   submitLabel,
   cancelHref,
 }: ClientFormProps) {
-  const [state, formAction, pending] = useActionState(action, {
+  // Without JavaScript (or before hydration) the form posts to the Server Action itself and
+  // this state holds its answer. With JavaScript, handleSubmit validates in the browser and
+  // calls the action directly, so a failed request can be caught and the input kept.
+  const [serverState, formAction] = useActionState(action, {
     values: initialValues,
     fieldErrors: {},
     formError: null,
   });
+  const [browserState, setBrowserState] = useState<ClientFormState | null>(null);
+  const [pending, startSave] = useTransition();
   const [browserErrors, setBrowserErrors] = useState<ClientFieldErrors | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateClient[]>([]);
   const [, startDuplicateCheck] = useTransition();
   const lastCheckedKey = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
+  const state = browserState ?? serverState;
   const errors = browserErrors ?? state.fieldErrors;
   const hasErrors = firstInvalidField(errors) !== undefined;
 
@@ -78,14 +90,31 @@ export function ClientForm({
   }, [state]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    const validation = validateClientInput(readClientFormValues(new FormData(event.currentTarget)));
-    if (validation.success) {
-      setBrowserErrors(null);
+    // With JavaScript the save always runs here; the form action is the no-JavaScript path.
+    event.preventDefault();
+    if (pending) {
       return;
     }
-    event.preventDefault();
-    setBrowserErrors(validation.fieldErrors);
-    focusField(event.currentTarget, firstInvalidField(validation.fieldErrors));
+    const formData = new FormData(event.currentTarget);
+    const values = readClientFormValues(formData);
+    const validation = validateClientInput(values);
+    if (!validation.success) {
+      setBrowserErrors(validation.fieldErrors);
+      focusField(event.currentTarget, firstInvalidField(validation.fieldErrors));
+      return;
+    }
+    setBrowserErrors(null);
+    startSave(async () => {
+      try {
+        // On success the action redirects to the card; it returns only with errors.
+        setBrowserState(await action(state, formData));
+      } catch (error) {
+        unstable_rethrow(error);
+        // The request failed (no connection, server error): nothing was saved. The fields
+        // were never reset, so everything the user typed is still in the form.
+        setBrowserState({ values, fieldErrors: {}, formError: SAVE_UNAVAILABLE_MESSAGE });
+      }
+    });
   }
 
   function checkDuplicateName(name: string) {
@@ -101,9 +130,18 @@ export function ClientForm({
     }
     lastCheckedKey.current = key;
     startDuplicateCheck(async () => {
-      const result = await findDuplicateClientsAction({ name, excludeId: clientId });
+      let result: DuplicateClientsResult;
+      try {
+        result = await findDuplicateClientsAction({ name, excludeId: clientId });
+      } catch {
+        // The request failed. The warning is advisory, and the card shows it after saving.
+        result = { ok: false };
+      }
       // A later check replaced this one, or the lookup failed: the warning is advisory only.
       if (lastCheckedKey.current !== key || !result.ok) {
+        if (lastCheckedKey.current === key) {
+          lastCheckedKey.current = null;
+        }
         return;
       }
       setDuplicates(result.clients);
@@ -182,7 +220,7 @@ export function ClientForm({
       <TextareaField name="notes" label="הערות" defaultValue={values.notes} error={errors.notes} />
 
       <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={pending} aria-busy={pending}>
+        <Button type="submit" pending={pending}>
           {pending ? "שומר…" : submitLabel}
         </Button>
         <Link href={cancelHref} className={buttonClasses("secondary")}>

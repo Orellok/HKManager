@@ -78,10 +78,10 @@ export function ConfirmDialog({
           {error}
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <Button ref={cancelRef} variant="secondary" onClick={close} disabled={pending}>
+          <Button ref={cancelRef} variant="secondary" onClick={close} pending={pending}>
             {cancelLabel}
           </Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={pending} aria-busy={pending}>
+          <Button variant="destructive" onClick={onConfirm} pending={pending}>
             {pending ? pendingLabel : confirmLabel}
           </Button>
         </div>

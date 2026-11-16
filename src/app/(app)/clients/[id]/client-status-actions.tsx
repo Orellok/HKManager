@@ -1,5 +1,6 @@
 "use client";
 
+import { unstable_rethrow } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/button";
@@ -18,6 +19,7 @@ type ClientStatusActionsProps = {
 };
 
 const NO_STATUS: ClientStatusState = { message: null, error: null };
+const REQUEST_FAILED_MESSAGE = "הפעולה לא בוצעה. בדקו את החיבור ונסו שוב.";
 
 function archiveButtonLabel(isArchived: boolean, pending: boolean): string {
   if (isArchived) {
@@ -41,29 +43,43 @@ export function ClientStatusActions({
   const [archivePending, startArchive] = useTransition();
   const [deletePending, startDelete] = useTransition();
 
+  // The archive button stays mounted and focused (it is never `disabled`), so after the
+  // action keyboard focus is on its counterpart: "שחזור מהארכיון" after archiving.
   function toggleArchive() {
+    if (archivePending) {
+      return;
+    }
+    setStatus(NO_STATUS);
     startArchive(async () => {
-      setStatus(await (isArchived ? restoreClientAction : archiveClientAction)(clientId));
+      try {
+        setStatus(await (isArchived ? restoreClientAction : archiveClientAction)(clientId));
+      } catch {
+        // The request failed (no connection, server error); nothing changed.
+        setStatus({ message: null, error: REQUEST_FAILED_MESSAGE });
+      }
     });
   }
 
   function confirmDelete() {
+    if (deletePending) {
+      return;
+    }
     setDeleteError(null);
     startDelete(async () => {
-      // On success the action redirects to the list; it only returns on failure.
-      const result = await deleteClientAction(clientId);
-      setDeleteError(result.error);
+      try {
+        // On success the action redirects to the list; it only returns on failure.
+        const result = await deleteClientAction(clientId);
+        setDeleteError(result.error);
+      } catch (error) {
+        unstable_rethrow(error);
+        setDeleteError(REQUEST_FAILED_MESSAGE);
+      }
     });
   }
 
   return (
     <>
-      <Button
-        variant="secondary"
-        onClick={toggleArchive}
-        disabled={archivePending}
-        aria-busy={archivePending}
-      >
+      <Button variant="secondary" onClick={toggleArchive} pending={archivePending}>
         {archiveButtonLabel(isArchived, archivePending)}
       </Button>
       <ConfirmDialog

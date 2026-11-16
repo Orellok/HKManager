@@ -23,7 +23,7 @@ Commit and push after every meaningful step.
 | M0.4 CI + migrations workflow | DONE – review APPROVED, QA PASS, 1 polish round; CI green on GitHub (runs 1-8). Staging/prod workflows verified by mocks only until first merge to main + secrets | docs/specs/m0-4-ci.md |
 | M1.1 Clients | DONE – review APPROVED, QA PASS, 3 fix rounds (duplicate notice; action errors/focus/CSP/CRLF; expired session) | docs/specs/m1-1-clients.md |
 | M1.2 Projects | DONE – review APPROVED, QA PASS, 2 fix rounds (polish: session 4xx rule, filter queue, date min/max; minor: partial date, range/digit messages) | docs/specs/m1-2-projects.md |
-| M1.3 Milestones + open debts | criteria approved – in implementation | docs/specs/m1-3-milestones.md |
+| M1.3 Milestones + open debts | in implementation – WIP (migration draft, field-rules, isIsoDate fix; unverified); dev hit usage limit 2026-11-16 | docs/specs/m1-3-milestones.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step

@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+/**
+ * The live region mounts empty and receives the message a moment later, so screen readers
+ * register the region first and then announce the change.
+ */
+const ANNOUNCE_DELAY_MS = 100;
 
 type RedirectNoticeProps = {
   /** The confirmation to show, or undefined for none. */
@@ -15,20 +21,25 @@ type RedirectNoticeProps = {
  * does not show it again.
  */
 export function RedirectNotice({ message, param }: RedirectNoticeProps) {
+  const [shown, setShown] = useState<string | undefined>(undefined);
+
   useEffect(() => {
-    if (message === undefined) {
-      return;
+    const timer = window.setTimeout(() => setShown(message), ANNOUNCE_DELAY_MS);
+    if (message !== undefined) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has(param)) {
+        url.searchParams.delete(param);
+        window.history.replaceState(window.history.state, "", url);
+      }
     }
-    const url = new URL(window.location.href);
-    if (url.searchParams.has(param)) {
-      url.searchParams.delete(param);
-      window.history.replaceState(window.history.state, "", url);
-    }
+    return () => window.clearTimeout(timer);
   }, [message, param]);
 
+  // Empty, the region is visually hidden but stays in the accessibility tree (not display:
+  // none), so the later message is announced; it takes no space in the layout.
   return (
-    <p role="status" className="text-sm font-medium empty:hidden">
-      {message}
+    <p role="status" className="text-sm font-medium empty:sr-only">
+      {shown}
     </p>
   );
 }

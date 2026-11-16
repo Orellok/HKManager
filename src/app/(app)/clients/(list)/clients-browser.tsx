@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { unstable_rethrow } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { Button, buttonClasses } from "@/components/button";
-import { redirectToLoginIfSessionEnded } from "@/lib/auth/action-failure";
-import { searchClientsAction, type SearchClientsResult } from "@/lib/clients/actions";
+import { useGuardedTransition } from "@/components/use-guarded-transition";
+import { callServerAction } from "@/lib/auth/action-failure";
+import { searchClientsAction } from "@/lib/clients/actions";
 import { NEW_CLIENT_PATH, clientPath } from "@/lib/clients/paths";
-import type { ClientListPage, ClientListView } from "@/lib/clients/queries";
+import type { ClientListItem, ClientListPage, ClientListView } from "@/lib/clients/queries";
 import { CLIENT_SEARCH_QUERY_MAX_LENGTH } from "@/lib/clients/schema";
+import { appendPage, type PagedListState } from "@/lib/paged-list";
 
-import { appendPage, type BrowserState } from "./browser-state";
+type BrowserState = PagedListState<ClientListItem, { query: string }>;
 
 type ClientsBrowserProps = {
   view: ClientListView;
@@ -22,8 +23,8 @@ type ClientsBrowserProps = {
 const SEARCH_FAILED = "החיפוש נכשל. אפשר לנסות שוב.";
 const LOAD_MORE_FAILED = "טעינת לקוחות נוספים נכשלה. אפשר לנסות שוב.";
 
-function resultSummary({ query, items, hasMore, searched }: BrowserState): string {
-  if (!searched || query === "") {
+function resultSummary({ filter, items, hasMore, searched }: BrowserState): string {
+  if (!searched || filter.query === "") {
     return "";
   }
   if (items.length === 0) {
@@ -41,14 +42,14 @@ function resultSummary({ query, items, hasMore, searched }: BrowserState): strin
  */
 export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
   const [state, setState] = useState<BrowserState>({
-    query: "",
+    filter: { query: "" },
     items: initialPage.items,
     hasMore: initialPage.hasMore,
     searched: false,
   });
   const [error, setError] = useState<string | null>(null);
-  const [searchPending, startSearch] = useTransition();
-  const [morePending, startLoadMore] = useTransition();
+  const [searchPending, startSearch] = useGuardedTransition();
+  const [morePending, startLoadMore] = useGuardedTransition();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   /** Index of the first item of a just-loaded last page, to move focus to once rendered. */
@@ -67,24 +68,19 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
   }, [state.items]);
 
   function search(query: string) {
-    setError(null);
     startSearch(async () => {
-      let result: SearchClientsResult;
-      try {
-        result = await searchClientsAction({ view, query, offset: 0 });
-      } catch (error) {
-        unstable_rethrow(error);
-        if (await redirectToLoginIfSessionEnded()) {
-          return;
-        }
-        // The request failed (no connection, server error); the list stays as it was.
-        result = { ok: false };
+      setError(null);
+      const call = await callServerAction(() => searchClientsAction({ view, query, offset: 0 }));
+      if (call.status === "redirected") {
+        return;
       }
-      if (!result.ok) {
+      // A failed request (no connection, server error) keeps the list as it was.
+      if (call.status === "failed" || !call.value.ok) {
         setError(SEARCH_FAILED);
         return;
       }
-      setState({ query, items: result.page.items, hasMore: result.page.hasMore, searched: true });
+      const { page } = call.value;
+      setState({ filter: { query }, items: page.items, hasMore: page.hasMore, searched: true });
     });
   }
 
@@ -111,24 +107,20 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
     if (busy) {
       return;
     }
-    setError(null);
-    const request = { query: state.query, offset: state.items.length };
+    const request = { filter: state.filter, offset: state.items.length };
     startLoadMore(async () => {
-      let result: SearchClientsResult;
-      try {
-        result = await searchClientsAction({ view, ...request });
-      } catch (error) {
-        unstable_rethrow(error);
-        if (await redirectToLoginIfSessionEnded()) {
-          return;
-        }
-        result = { ok: false };
+      setError(null);
+      const call = await callServerAction(() =>
+        searchClientsAction({ view, query: request.filter.query, offset: request.offset }),
+      );
+      if (call.status === "redirected") {
+        return;
       }
-      if (!result.ok) {
+      if (call.status === "failed" || !call.value.ok) {
         setError(LOAD_MORE_FAILED);
         return;
       }
-      const page = result.page;
+      const { page } = call.value;
       if (!page.hasMore && page.items.length > 0) {
         focusItemAfterLoad.current = request.offset;
       }
@@ -136,7 +128,7 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
     });
   }
 
-  const isSearchActive = state.query !== "";
+  const isSearchActive = state.filter.query !== "";
 
   return (
     <div className="space-y-4">

@@ -10,6 +10,8 @@ type FieldProps = {
   error?: string;
   /** Ids of more elements that describe the field, e.g. a warning below it. */
   describedBy?: string;
+  /** A short help text under the label, e.g. the expected format. */
+  hint?: string;
 };
 
 const CONTROL_CLASSES =
@@ -17,13 +19,15 @@ const CONTROL_CLASSES =
 
 function fieldIds(name: string) {
   const id = `field-${name}`;
-  return { id, errorId: `${id}-error` };
+  return { id, errorId: `${id}-error`, hintId: `${id}-hint` };
 }
 
-/** Attributes that tie a control to its label and error. */
-function controlAttributes({ name, error, describedBy }: FieldProps) {
-  const { id, errorId } = fieldIds(name);
-  const describedByIds = [error ? errorId : null, describedBy].filter(Boolean).join(" ");
+/** Attributes that tie a control to its label, hint and error. */
+function controlAttributes({ name, error, describedBy, hint }: FieldProps) {
+  const { id, errorId, hintId } = fieldIds(name);
+  const describedByIds = [error ? errorId : null, hint ? hintId : null, describedBy]
+    .filter(Boolean)
+    .join(" ");
   return {
     id,
     name,
@@ -37,9 +41,10 @@ function FieldShell({
   label,
   requiredMark,
   error,
+  hint,
   children,
 }: FieldProps & { children: ReactNode }) {
-  const { id, errorId } = fieldIds(name);
+  const { id, errorId, hintId } = fieldIds(name);
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-medium">
@@ -48,6 +53,11 @@ function FieldShell({
           <span className="text-muted-foreground font-normal"> {requiredMark}</span>
         ) : null}
       </label>
+      {hint ? (
+        <p id={hintId} className="text-muted-foreground text-sm">
+          {hint}
+        </p>
+      ) : null}
       {children}
       {error ? (
         <p id={errorId} className="text-destructive text-sm">
@@ -70,10 +80,11 @@ export function TextInputField({
   requiredMark,
   error,
   describedBy,
+  hint,
   className,
   ...inputProps
 }: TextInputFieldProps) {
-  const field = { name, label, requiredMark, error, describedBy };
+  const field = { name, label, requiredMark, error, describedBy, hint };
   return (
     <FieldShell {...field}>
       <input
@@ -94,10 +105,11 @@ export function TextareaField({
   requiredMark,
   error,
   describedBy,
+  hint,
   className,
   ...textareaProps
 }: TextareaFieldProps) {
-  const field = { name, label, requiredMark, error, describedBy };
+  const field = { name, label, requiredMark, error, describedBy, hint };
   return (
     <FieldShell {...field}>
       <textarea
@@ -105,6 +117,45 @@ export function TextareaField({
         {...controlAttributes(field)}
         className={cn(CONTROL_CLASSES, "min-h-28 py-2", className)}
       />
+    </FieldShell>
+  );
+}
+
+type SelectFieldProps = FieldProps &
+  Omit<ComponentProps<"select">, "name" | "id" | "children"> & {
+    options: readonly { value: string; label: string }[];
+    /** A first, empty choice such as "בחירת לקוח"; it submits "". */
+    placeholder?: string;
+  };
+
+/** A labelled native select with its error beside it (see TextInputField). */
+export function SelectField({
+  name,
+  label,
+  requiredMark,
+  error,
+  describedBy,
+  hint,
+  className,
+  options,
+  placeholder,
+  ...selectProps
+}: SelectFieldProps) {
+  const field = { name, label, requiredMark, error, describedBy, hint };
+  return (
+    <FieldShell {...field}>
+      <select
+        {...selectProps}
+        {...controlAttributes(field)}
+        className={cn(CONTROL_CLASSES, "min-h-11", className)}
+      >
+        {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </FieldShell>
   );
 }

@@ -5,13 +5,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "@/lib/zod";
 
+import type { ActionStatus } from "@/lib/action-status";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import type { ServerFormState } from "@/lib/forms";
+import { withNotice } from "@/lib/notices";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { isSameClientName } from "./duplicate-name";
 import { logClientFailure } from "./log";
 import { saveNotice } from "./notices";
-import { CLIENTS_PATH, clientPath, withNotice, type ClientNotice } from "./paths";
+import { CLIENTS_PATH, clientPath, type ClientNotice } from "./paths";
 import {
   deleteClient,
   findClientsWithSameName,
@@ -28,8 +31,7 @@ import {
   clientIdSchema,
   readClientFormValues,
   validateClientInput,
-  type ClientFieldErrors,
-  type ClientFormValues,
+  type ClientField,
 } from "./schema";
 
 /**
@@ -38,13 +40,9 @@ import {
  * ids bound in the browser, which a caller can change.
  */
 
-export type ClientFormState = {
-  values: ClientFormValues;
-  fieldErrors: ClientFieldErrors;
-  formError: string | null;
-};
+export type ClientFormState = ServerFormState<ClientField>;
 
-export type ClientStatusState = { message: string | null; error: string | null };
+export type ClientStatusState = ActionStatus;
 
 export type SearchClientsResult = { ok: true; page: ClientListPage } | { ok: false };
 

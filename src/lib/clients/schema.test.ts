@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizeLineBreaks } from "@/lib/forms";
+
 import {
   CLIENT_FIELD_MAX_LENGTH,
   CLIENT_FIELD_MESSAGES,
   EMPTY_CLIENT_FORM_VALUES,
-  normalizeLineBreaks,
   readClientFormValues,
   validateClientInput,
   type ClientFormValues,

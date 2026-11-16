@@ -1,3 +1,11 @@
+import {
+  emptyToNull,
+  readFormValues,
+  validateForm,
+  withNormalizedLineBreaks,
+  type FieldErrors,
+  type ValidationResult,
+} from "@/lib/forms";
 import { z } from "@/lib/zod";
 
 /**
@@ -31,24 +39,6 @@ export const CLIENT_FIELD_MESSAGES = {
   addressTooLong: `הכתובת ארוכה מדי (עד ${CLIENT_FIELD_MAX_LENGTH.address} תווים).`,
   notesTooLong: `ההערות ארוכות מדי (עד ${CLIENT_FIELD_MAX_LENGTH.notes} תווים).`,
 } as const;
-
-const emptyToNull = (value: string): string | null => (value === "" ? null : value);
-
-/**
- * Line breaks as "\n". A browser counts a textarea line break as one character but submits
- * it as "\r\n", so without this the server would count more characters than the form did
- * (and store "\r\n"). Applied before trimming and the length checks.
- */
-export function normalizeLineBreaks(value: string): string {
-  return value.replace(/\r\n?/g, "\n");
-}
-
-function withNormalizedLineBreaks<Schema extends z.ZodType>(schema: Schema) {
-  return z.preprocess(
-    (value) => (typeof value === "string" ? normalizeLineBreaks(value) : value),
-    schema,
-  );
-}
 
 function optionalText(field: ClientField, tooLong: string) {
   return z.string().trim().max(CLIENT_FIELD_MAX_LENGTH[field], { error: tooLong });
@@ -92,7 +82,7 @@ export type ClientFormValues = Record<ClientField, string>;
 /** A validated client, ready to store. */
 export type ClientInput = z.output<typeof clientInputSchema>;
 
-export type ClientFieldErrors = Partial<Record<ClientField, string>>;
+export type ClientFieldErrors = FieldErrors<ClientField>;
 
 export const EMPTY_CLIENT_FORM_VALUES: ClientFormValues = {
   name: "",
@@ -104,32 +94,14 @@ export const EMPTY_CLIENT_FORM_VALUES: ClientFormValues = {
 
 /** Reads the client fields from a submitted form. A missing or non-text field reads as "". */
 export function readClientFormValues(formData: FormData): ClientFormValues {
-  const values = { ...EMPTY_CLIENT_FORM_VALUES };
-  for (const field of CLIENT_FIELDS) {
-    const value = formData.get(field);
-    values[field] = typeof value === "string" ? value : "";
-  }
-  return values;
+  return readFormValues(formData, CLIENT_FIELDS);
 }
 
-export type ClientValidationResult =
-  { success: true; data: ClientInput } | { success: false; fieldErrors: ClientFieldErrors };
+export type ClientValidationResult = ValidationResult<ClientField, ClientInput>;
 
 /** Validates form values; on failure returns the first message for each invalid field. */
 export function validateClientInput(values: ClientFormValues): ClientValidationResult {
-  const result = clientInputSchema.safeParse(values);
-  if (result.success) {
-    return { success: true, data: result.data };
-  }
-  const flattened = z.flattenError(result.error).fieldErrors;
-  const fieldErrors: ClientFieldErrors = {};
-  for (const field of CLIENT_FIELDS) {
-    const message = flattened[field]?.[0];
-    if (message) {
-      fieldErrors[field] = message;
-    }
-  }
-  return { success: false, fieldErrors };
+  return validateForm(clientInputSchema, CLIENT_FIELDS, values);
 }
 
 /** Client ids are uuids; anything else cannot name a client. */

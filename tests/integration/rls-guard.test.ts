@@ -18,7 +18,9 @@ describe("RLS guard", () => {
     const tables = await queryLocalDatabase<TableRow>(PUBLIC_TABLES_SQL);
 
     // Guards against a vacuous pass if the query stopped seeing the schema.
-    expect(tables.map((table) => table.table_name)).toContain("allowed_users");
+    expect(tables.map((table) => table.table_name)).toEqual(
+      expect.arrayContaining(["allowed_users", "clients", "projects"]),
+    );
 
     const tablesWithoutRls = tables
       .filter((table) => !table.rls_enabled)

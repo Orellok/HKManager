@@ -2,8 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Heebo } from "next/font/google";
 import { connection } from "next/server";
 
+import { AppNav } from "@/components/app-nav";
 import { SignOutForm } from "@/components/sign-out-form";
-import { getVerifiedUser } from "@/lib/auth/guards";
+import { getUserAccess } from "@/lib/auth/guards";
+import { cn } from "@/lib/utils";
 
 import "./globals.css";
 
@@ -28,7 +30,9 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   // The nonce-based CSP only works when every page is rendered per request.
   await connection();
-  const user = await getVerifiedUser();
+  const { user, decision } = await getUserAccess();
+  // The navigation is for allowlisted users only; never on /login or "אין הרשאה".
+  const showNav = decision === "allow";
 
   return (
     <html lang="he" dir="rtl" className={heebo.variable}>
@@ -39,7 +43,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             {user ? <SignOutForm label="יציאה" /> : null}
           </div>
         </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+        <div className="mx-auto flex w-full max-w-5xl flex-1">
+          {showNav ? <AppNav /> : null}
+          {/* On mobile the bottom navigation is fixed; the extra bottom padding keeps it from
+              covering the end of the page. */}
+          <main className={cn("min-w-0 flex-1 px-4 py-6", showNav && "pb-24 md:pb-6")}>
+            {children}
+          </main>
+        </div>
       </body>
     </html>
   );

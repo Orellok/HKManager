@@ -85,7 +85,7 @@ test.describe("M0.1-4: RTL shell", () => {
     expect(heeboLoaded).toBe(true);
   });
 
-  test("M0.1-4: header shows HKManager, main landmark exists, no navigation", async ({ page }) => {
+  test("M0.1-4: header shows HKManager, main landmark exists, one navigation", async ({ page }) => {
     await page.goto("/");
 
     // M0.3-7 adds the sign-out button for a signed-in user; nothing else is in the header.
@@ -93,7 +93,9 @@ test.describe("M0.1-4: RTL shell", () => {
     await expect(page.getByRole("banner").getByRole("button")).toHaveText(["יציאה"]);
     await expect(page.getByRole("main")).toHaveCount(1);
     await expect(page.getByRole("main")).toBeVisible();
-    await expect(page.getByRole("navigation")).toHaveCount(0);
+    // M1.1-8 adds the main navigation (bottom on mobile, side on desktop); see clients.spec.ts.
+    await expect(page.getByRole("navigation")).toHaveCount(1);
+    await expect(page.getByRole("navigation", { name: "ניווט ראשי" })).toBeVisible();
   });
 
   test("M0.1-4: no horizontal page scroll at the supported widths", async ({ page }, testInfo) => {
@@ -205,12 +207,13 @@ test.describe("M0.1-6: security headers", () => {
 
       expect(violations, `CSP violations on ${path}`).toEqual([]);
 
-      const scriptNonces = await page.evaluate(() =>
-        [...document.querySelectorAll("script")].map((script) => script.nonce),
-      );
-      expect(scriptNonces.length).toBeGreaterThan(0);
-      for (const scriptNonce of scriptNonces) {
-        expect(scriptNonce).toBe(nonce);
+      // Every script tag the server rendered carries this request's nonce. Chunks the
+      // runtime loads later (e.g. code for a prefetched route from the M1.1 navigation) are
+      // inserted without one and allowed by 'strict-dynamic'; the violation check covers them.
+      const scriptTags = (await response!.text()).match(/<script\b[^>]*>/g) ?? [];
+      expect(scriptTags.length).toBeGreaterThan(0);
+      for (const scriptTag of scriptTags) {
+        expect(scriptTag).toContain(`nonce="${nonce}"`);
       }
     }
   });

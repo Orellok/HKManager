@@ -1,0 +1,110 @@
+import {
+  emptyToNull,
+  readFormValues,
+  validateForm,
+  withNormalizedLineBreaks,
+  type FieldErrors,
+  type ValidationResult,
+} from "@/lib/forms";
+import { z } from "@/lib/zod";
+
+/**
+ * The client form schema (CLI-1), shared by the form in the browser and the Server Actions.
+ * Owner decision (M1.1): only `name` is required. Values are trimmed; an empty optional field
+ * is stored as null. The database repeats these limits as check constraints.
+ */
+
+export const CLIENT_FIELDS = ["name", "phone", "email", "address", "notes"] as const;
+
+export type ClientField = (typeof CLIENT_FIELDS)[number];
+
+export const CLIENT_FIELD_MAX_LENGTH: Record<ClientField, number> = {
+  name: 120,
+  phone: 30,
+  email: 254,
+  address: 200,
+  notes: 2000,
+};
+
+/** Digits, spaces, "-" and "+", with at least one digit. */
+const PHONE_PATTERN = /^[0-9 +-]*[0-9][0-9 +-]*$/;
+
+export const CLIENT_FIELD_MESSAGES = {
+  nameRequired: "יש להזין שם לקוח.",
+  nameTooLong: `השם ארוך מדי (עד ${CLIENT_FIELD_MAX_LENGTH.name} תווים).`,
+  phoneInvalid: "יש להזין מספר טלפון בספרות. מותר להוסיף רווחים, מקף (-) ופלוס (+).",
+  phoneTooLong: `מספר הטלפון ארוך מדי (עד ${CLIENT_FIELD_MAX_LENGTH.phone} תווים).`,
+  emailInvalid: "יש להזין כתובת מייל תקינה, למשל name@example.com.",
+  emailTooLong: `כתובת המייל ארוכה מדי (עד ${CLIENT_FIELD_MAX_LENGTH.email} תווים).`,
+  addressTooLong: `הכתובת ארוכה מדי (עד ${CLIENT_FIELD_MAX_LENGTH.address} תווים).`,
+  notesTooLong: `ההערות ארוכות מדי (עד ${CLIENT_FIELD_MAX_LENGTH.notes} תווים).`,
+} as const;
+
+function optionalText(field: ClientField, tooLong: string) {
+  return z.string().trim().max(CLIENT_FIELD_MAX_LENGTH[field], { error: tooLong });
+}
+
+const emailFormat = z.email();
+
+export const clientInputSchema = z.object({
+  name: withNormalizedLineBreaks(
+    z
+      .string()
+      .trim()
+      .min(1, { error: CLIENT_FIELD_MESSAGES.nameRequired })
+      .max(CLIENT_FIELD_MAX_LENGTH.name, { error: CLIENT_FIELD_MESSAGES.nameTooLong }),
+  ),
+  phone: withNormalizedLineBreaks(
+    optionalText("phone", CLIENT_FIELD_MESSAGES.phoneTooLong)
+      .refine((value) => value === "" || PHONE_PATTERN.test(value), {
+        error: CLIENT_FIELD_MESSAGES.phoneInvalid,
+      })
+      .transform(emptyToNull),
+  ),
+  email: withNormalizedLineBreaks(
+    optionalText("email", CLIENT_FIELD_MESSAGES.emailTooLong)
+      .refine((value) => value === "" || emailFormat.safeParse(value).success, {
+        error: CLIENT_FIELD_MESSAGES.emailInvalid,
+      })
+      .transform(emptyToNull),
+  ),
+  address: withNormalizedLineBreaks(
+    optionalText("address", CLIENT_FIELD_MESSAGES.addressTooLong).transform(emptyToNull),
+  ),
+  notes: withNormalizedLineBreaks(
+    optionalText("notes", CLIENT_FIELD_MESSAGES.notesTooLong).transform(emptyToNull),
+  ),
+});
+
+/** What the user typed, as strings; kept so a failed save never loses input. */
+export type ClientFormValues = Record<ClientField, string>;
+
+/** A validated client, ready to store. */
+export type ClientInput = z.output<typeof clientInputSchema>;
+
+export type ClientFieldErrors = FieldErrors<ClientField>;
+
+export const EMPTY_CLIENT_FORM_VALUES: ClientFormValues = {
+  name: "",
+  phone: "",
+  email: "",
+  address: "",
+  notes: "",
+};
+
+/** Reads the client fields from a submitted form. A missing or non-text field reads as "". */
+export function readClientFormValues(formData: FormData): ClientFormValues {
+  return readFormValues(formData, CLIENT_FIELDS);
+}
+
+export type ClientValidationResult = ValidationResult<ClientField, ClientInput>;
+
+/** Validates form values; on failure returns the first message for each invalid field. */
+export function validateClientInput(values: ClientFormValues): ClientValidationResult {
+  return validateForm(clientInputSchema, CLIENT_FIELDS, values);
+}
+
+/** Client ids are uuids; anything else cannot name a client. */
+export const clientIdSchema = z.uuid();
+
+export const CLIENT_SEARCH_QUERY_MAX_LENGTH = 100;

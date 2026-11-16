@@ -1,0 +1,16 @@
+# VERIFY-02 – Netlify free plan (checked 2026-11-16)
+
+Method: web search. netlify.com and docs.netlify.com are blocked from the cloud session's network, so official pages could not be opened directly; findings rely on search-result excerpts of official pages where marked.
+
+| Question (SPEC 13) | Finding | Confidence |
+|---|---|---|
+| Commercial use on the free plan | Allowed. Netlify's own "Introducing the Netlify Free plan" post: "you can deploy commercial projects…". The Self-Serve Subscription Agreement lets Netlify change or discontinue the free tier. | High (official, via search excerpt) |
+| Next.js 16 support | Supported via Netlify's OpenNext adapter (official changelog "Next.js 16 is ready to deploy on Netlify"). App Router, Server Actions, Route Handlers, streaming listed as fully supported in Netlify docs. | High (official, via search excerpt) |
+| `proxy.ts` (Next 16, Node.js runtime only) | **Unconfirmed.** Netlify docs say middleware runs on Edge Functions "with some limitations, including for Node.js middleware". Next 16 `proxy.ts` is Node-only. Our proxy carries auth + nonce CSP, so this is critical. | **Open – must be proven on the first staging deploy** |
+| Limits | Newer accounts: credit model, ~300 credits/month, **hard limit – sites pause when exhausted** until upgrade. One source: ~15 credits per production deploy (≈20 production deploys/month), plus bandwidth/requests. Older accounts may have separate meters. | Medium (third-party, conflicting) |
+| Site name `hkmanager.netlify.app` | Can only be checked when creating the site. | Owner checks at setup |
+
+## Consequences for M0.6 (to be decided in its criteria)
+1. **Gate:** the first staging deploy must prove that `proxy.ts` runs on Netlify: login redirect, `/unauthorized`, nonce CSP header on pages, prefetch-bypass protection. If it does not, STOP and bring options to the owner (e.g. keep auth in page guards only, or another host) – no workaround without approval.
+2. **Credit budget:** do not deploy staging on every push automatically if each deploy costs credits. Options: deploy staging only on push to `main` (not every branch), or manual; check in the Netlify dashboard what a deploy actually costs after the first one.
+3. Re-check the pricing page in the dashboard when the account is created (owner).

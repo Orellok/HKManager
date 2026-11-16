@@ -18,11 +18,11 @@ Commit and push after every meaningful step.
 |---|---|---|
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
 | M0.3 Auth | DONE – review APPROVED, QA PASS, 2 fix rounds (prefetch auth bypass; hook fail-closed + /login redirect) | docs/specs/m0-3-auth.md |
-| M0.4 CI + migrations workflow | review APPROVED; real GitHub CI runs 1-4 all green (2026-11-16) – polish round (review hardening items) | docs/specs/m0-4-ci.md |
+| M0.4 CI + migrations workflow | review APPROVED; real GitHub CI runs 1-4 all green (2026-11-16) – polish round done (7d2f2c5, b85ee9a) – in re-review | docs/specs/m0-4-ci.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
-M0.4 polish (senior-developer): guard requires staging migrate job success + event/branch filters; CI push trigger branches only; concurrency wording; step-level secret env; comment on double build; drop database_write scope note. Then re-review, then QA. Ask owner: were any migrations applied manually to staging/prod? Owner to create 3 GitHub secrets (docs/setup/github-secrets.md). (2026-11-16: owner approved M0.4 criteria, revised M0 split and M0.3 Hebrew copy.)
+Re-review M0.4 polish (diff faad1a7..HEAD) and confirm CI runs 6-7 green, then QA. Unverified until first push to main: staging check-head API call, guard jobs endpoint and branch/event filters (all fail closed). Ask owner: were any migrations applied manually to staging/prod? Owner to create 3 GitHub secrets (docs/setup/github-secrets.md). (2026-11-16: owner approved M0.4 criteria, revised M0 split and M0.3 Hebrew copy.)
 Manual staging check (when Google OAuth + staging exist): allowlisted Google account is created and reaches home – confirms GoTrue sends user_metadata.email_verified (hook fails closed otherwise).
 Proposed split: M0.4 CI + Supabase migrations workflows; M0.5 Sentry; M0.6 Netlify staging/prod deploy (needs owner Netlify account + VERIFY-02).
 Carry into M0.3: CSP connect-src += Supabase URL; @types/node ^22; focus ring contrast fix; revisit enable_signup for Google OAuth; SQL-level test for missing/empty email claim; optional tests (normal emails accepted, ~3000-char email).

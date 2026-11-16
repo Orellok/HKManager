@@ -14,7 +14,7 @@ Commit and push after every meaningful step.
 - 2026-11-16: owner approved M1.1 Hebrew copy and choices (search on submit via POST, duplicate check on blur + post-save notice, phone rules, max lengths).
 - 2026-11-16: owner approved M1.1 round-2 copy ("לא ניתן לשמור כרגע…", "הפעולה לא בוצעה…", "לא הצלחנו לטעון את הדף").
 - 2026-11-16: owner approved M1.2 copy and bounds (₪ after number per he-IL, ₪99,999,999.99 max, dates 1900–2100, 500-client hint wording, 50 projects on client card, range/digit messages).
-- 2026-11-16: owner wants small PRs to main. Stacked PRs opened: Orellok/HKManager#1 (M0, branch claude/pr-1-m0-foundation @77f541a), #2 (M1.1, claude/pr-2-m1.1-clients @d3d1619), #3 (M1.2, claude/pr-3-m1.2-projects @6181bf8). Recommend merge commits (not squash). Going forward: one PR per feature from a branch at the feature's DONE commit; development continues on claude/adoring-rubin-yrdzla.
+- 2026-11-16: owner wants small PRs to main. Stacked PRs opened: Orellok/HKManager#1 (M0, branch claude/pr-1-m0-foundation @77f541a), #2 (M1.1, claude/pr-2-m1.1-clients @d3d1619), #3 (M1.2, claude/pr-3-m1.2-projects @6181bf8). Owner merged all 3 at once: #1 reached main; #2/#3 landed only in stacked base branches → catch-up PR Orellok/HKManager#4 (claude/pr-2-m1.1-clients → main). Lesson: no more stacked PRs – each feature PR targets main directly after the previous one merged. Going forward: one PR per feature from a branch at the feature's DONE commit; development continues on claude/adoring-rubin-yrdzla.
 - Owner wants work committed continuously and resumed autonomously after interruptions.
 
 ## Status

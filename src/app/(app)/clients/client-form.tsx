@@ -6,6 +6,7 @@ import { useActionState, useEffect, useRef, useState, useTransition, type FormEv
 
 import { Button, buttonClasses } from "@/components/button";
 import { TextInputField, TextareaField } from "@/components/form-field";
+import { redirectToLoginIfSessionEnded } from "@/lib/auth/action-failure";
 import {
   findDuplicateClientsAction,
   type ClientFormState,
@@ -110,6 +111,9 @@ export function ClientForm({
         setBrowserState(await action(state, formData));
       } catch (error) {
         unstable_rethrow(error);
+        if (await redirectToLoginIfSessionEnded()) {
+          return;
+        }
         // The request failed (no connection, server error): nothing was saved. The fields
         // were never reset, so everything the user typed is still in the form.
         setBrowserState({ values, fieldErrors: {}, formError: SAVE_UNAVAILABLE_MESSAGE });
@@ -133,8 +137,10 @@ export function ClientForm({
       let result: DuplicateClientsResult;
       try {
         result = await findDuplicateClientsAction({ name, excludeId: clientId });
-      } catch {
-        // The request failed. The warning is advisory, and the card shows it after saving.
+      } catch (error) {
+        unstable_rethrow(error);
+        // The request failed. The warning is advisory, and the card shows it after saving;
+        // an ended session is caught when the user saves.
         result = { ok: false };
       }
       // A later check replaced this one, or the lookup failed: the warning is advisory only.

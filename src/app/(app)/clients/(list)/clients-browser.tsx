@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 
 import { Button, buttonClasses } from "@/components/button";
+import { redirectToLoginIfSessionEnded } from "@/lib/auth/action-failure";
 import { searchClientsAction, type SearchClientsResult } from "@/lib/clients/actions";
 import { NEW_CLIENT_PATH, clientPath } from "@/lib/clients/paths";
 import type { ClientListPage, ClientListView } from "@/lib/clients/queries";
@@ -70,7 +72,11 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
       let result: SearchClientsResult;
       try {
         result = await searchClientsAction({ view, query, offset: 0 });
-      } catch {
+      } catch (error) {
+        unstable_rethrow(error);
+        if (await redirectToLoginIfSessionEnded()) {
+          return;
+        }
         // The request failed (no connection, server error); the list stays as it was.
         result = { ok: false };
       }
@@ -111,7 +117,11 @@ export function ClientsBrowser({ view, initialPage }: ClientsBrowserProps) {
       let result: SearchClientsResult;
       try {
         result = await searchClientsAction({ view, ...request });
-      } catch {
+      } catch (error) {
+        unstable_rethrow(error);
+        if (await redirectToLoginIfSessionEnded()) {
+          return;
+        }
         result = { ok: false };
       }
       if (!result.ok) {

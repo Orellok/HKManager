@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import { Button } from "@/components/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { redirectToLoginIfSessionEnded } from "@/lib/auth/action-failure";
 import {
   archiveClientAction,
   deleteClientAction,
@@ -53,7 +54,11 @@ export function ClientStatusActions({
     startArchive(async () => {
       try {
         setStatus(await (isArchived ? restoreClientAction : archiveClientAction)(clientId));
-      } catch {
+      } catch (error) {
+        unstable_rethrow(error);
+        if (await redirectToLoginIfSessionEnded()) {
+          return;
+        }
         // The request failed (no connection, server error); nothing changed.
         setStatus({ message: null, error: REQUEST_FAILED_MESSAGE });
       }
@@ -72,6 +77,9 @@ export function ClientStatusActions({
         setDeleteError(result.error);
       } catch (error) {
         unstable_rethrow(error);
+        if (await redirectToLoginIfSessionEnded()) {
+          return;
+        }
         setDeleteError(REQUEST_FAILED_MESSAGE);
       }
     });

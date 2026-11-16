@@ -841,3 +841,54 @@ test_.describe("CLI-1: line breaks in notes", () => {
     },
   );
 });
+
+test_.describe("AUTH-3: an ended session during an action goes to the login screen", () => {
+  test_(
+    "CLI-2: archiving after the session ended opens /login",
+    async ({ page, context, token, seedClient }) => {
+      const id = await seedClient({ name: `פג תוקף ${token}` });
+      await page.goto(`/clients/${id}`);
+      await context.clearCookies();
+
+      await page.getByRole("button", { name: "העברה לארכיון" }).click();
+
+      await expect(page).toHaveURL(/\/login$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("כניסה");
+      const { data } = await createServiceRoleClient()
+        .from("clients")
+        .select("archived_at")
+        .eq("id", id)
+        .single();
+      expect(data?.archived_at).toBeNull();
+    },
+  );
+
+  test_("CLI-1: saving after the session ended opens /login", async ({ page, context, token }) => {
+    await page.goto("/clients/new");
+    await nameField(page).fill(`פג תוקף ${token}`);
+    await context.clearCookies();
+
+    await page.getByRole("button", { name: "שמירת לקוח" }).click();
+
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("כניסה");
+    const { data } = await createServiceRoleClient()
+      .from("clients")
+      .select("id")
+      .eq("name", `פג תוקף ${token}`);
+    expect(data).toEqual([]);
+  });
+
+  test_(
+    "CLI-3: searching after the session ended opens /login",
+    async ({ page, context, token }) => {
+      await page.goto("/clients");
+      await context.clearCookies();
+
+      await page.getByRole("searchbox", { name: "חיפוש לפי שם או טלפון" }).fill(token);
+      await page.getByRole("button", { name: "חיפוש", exact: true }).click();
+
+      await expect(page).toHaveURL(/\/login$/);
+    },
+  );
+});

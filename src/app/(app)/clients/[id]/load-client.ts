@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { logClientFailure } from "@/lib/clients/log";
 import { getClient, type Client } from "@/lib/clients/queries";
 import { clientIdSchema } from "@/lib/clients/schema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -10,7 +11,14 @@ export async function loadClientOrNotFound(params: Promise<{ id: string }>): Pro
   if (!parsed.success) {
     notFound();
   }
-  const client = await getClient(await createSupabaseServerClient(), parsed.data);
+  let client: Client | null;
+  try {
+    client = await getClient(await createSupabaseServerClient(), parsed.data);
+  } catch (error) {
+    // Logged by code only; the error boundary gets no database details (SPEC 8).
+    logClientFailure("read", error);
+    throw new Error("Could not load the client");
+  }
   if (!client) {
     notFound();
   }

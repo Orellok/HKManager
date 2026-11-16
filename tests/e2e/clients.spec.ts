@@ -202,6 +202,77 @@ test_.describe("CLI-1: create and edit", () => {
     },
   );
 
+  test_(
+    "CLI-1: saving a duplicate name with Enter shows the duplicate notice on the card",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `Dana Levi ${token}` });
+      await page.goto("/clients/new");
+
+      await nameField(page).fill(`DANA levi ${token}`);
+      await nameField(page).press("Enter");
+
+      await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(`DANA levi ${token}`);
+      await expect(
+        page
+          .getByRole("status")
+          .filter({ hasText: "הלקוח נשמר. שימו לב: כבר קיים לקוח נוסף בשם הזה." }),
+      ).toBeVisible();
+    },
+  );
+
+  test_(
+    "CLI-1: saving a name that only an archived client has shows the archived notice",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `ארכיוני ${token}`, archived_at: new Date().toISOString() });
+      await page.goto("/clients/new");
+
+      await nameField(page).fill(`ארכיוני ${token}`);
+      await nameField(page).press("Enter");
+
+      await expect(
+        page
+          .getByRole("status")
+          .filter({ hasText: "הלקוח נשמר. שימו לב: בארכיון כבר יש לקוח בשם הזה." }),
+      ).toBeVisible();
+    },
+  );
+
+  test_(
+    "CLI-1: renaming a client to an existing name in the edit form shows the duplicate notice",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `יוסי כהן ${token}` });
+      const id = await seedClient({ name: `שם אחר ${token}` });
+      await page.goto(`/clients/${id}/edit`);
+
+      await nameField(page).fill(`יוסי כהן ${token}`);
+      await nameField(page).press("Enter");
+
+      await expect(page).toHaveURL(new RegExp(`/clients/${id}$`));
+      await expect(
+        page
+          .getByRole("status")
+          .filter({ hasText: "השינויים נשמרו. שימו לב: כבר קיים לקוח נוסף בשם הזה." }),
+      ).toBeVisible();
+    },
+  );
+
+  test_(
+    "CLI-1: saving the edit form without changing the name shows no duplicate notice",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `כפול ${token}` });
+      const id = await seedClient({ name: `כפול ${token}` });
+      await page.goto(`/clients/${id}/edit`);
+
+      await page.getByRole("textbox", { name: "כתובת" }).fill("כתובת חדשה");
+      await page.getByRole("textbox", { name: "כתובת" }).press("Enter");
+
+      await expect(page.getByRole("status").filter({ hasText: "השינויים נשמרו." })).toHaveText(
+        "השינויים נשמרו.",
+      );
+    },
+  );
+
   test_("CLI-1: a unique name shows no duplicate warning", async ({ page, token }) => {
     await page.goto("/clients/new");
 

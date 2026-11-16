@@ -3,6 +3,7 @@ import Link from "next/link";
 import { buttonClasses } from "@/components/button";
 import { RedirectNotice } from "@/components/redirect-notice";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { clientNoticeMessage } from "@/lib/clients/notices";
 import {
   ARCHIVED_CLIENTS_PATH,
   CLIENTS_PATH,
@@ -13,19 +14,13 @@ import {
 import { ClientStatusActions } from "./client-status-actions";
 import { loadClientOrNotFound } from "./load-client";
 
-const NOTICES: Record<string, string> = {
-  created: "הלקוח נשמר.",
-  updated: "השינויים נשמרו.",
-};
-
 type DetailRow = { label: string; value: string | null; href?: string; ltr?: boolean };
 
 /** CLI-4: the client card. M1.1 shows the details; projects and balances come in M1.2 / M2. */
 export default async function ClientPage({ params, searchParams }: PageProps<"/clients/[id]">) {
   await requireAllowedUser();
   const client = await loadClientOrNotFound(params);
-  const noticeKey = (await searchParams)[NOTICE_PARAM];
-  const notice = typeof noticeKey === "string" ? NOTICES[noticeKey] : undefined;
+  const notice = clientNoticeMessage((await searchParams)[NOTICE_PARAM]);
   const isArchived = client.archived_at !== null;
 
   const details: DetailRow[] = [

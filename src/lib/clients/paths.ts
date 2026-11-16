@@ -16,9 +16,19 @@ export const VIEW_PARAM = "view";
 export const ARCHIVED_VIEW = "archived";
 export const ARCHIVED_CLIENTS_PATH = `${CLIENTS_PATH}?${VIEW_PARAM}=${ARCHIVED_VIEW}`;
 
-/** A one-time confirmation after a redirect, e.g. `?notice=created`. */
+/**
+ * A one-time confirmation after a redirect, e.g. `?notice=created`. The codes carry no
+ * personal data; see notices.ts for their texts.
+ */
 export const NOTICE_PARAM = "notice";
-export type ClientNotice = "created" | "updated" | "deleted";
+export type ClientNotice =
+  | "created"
+  | "created_duplicate"
+  | "created_duplicate_archived"
+  | "updated"
+  | "updated_duplicate"
+  | "updated_duplicate_archived"
+  | "deleted";
 
 export function withNotice(path: string, notice: ClientNotice): string {
   return `${path}?${NOTICE_PARAM}=${notice}`;

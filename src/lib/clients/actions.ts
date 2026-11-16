@@ -1,5 +1,6 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -7,10 +8,14 @@ import { z } from "zod";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { CLIENTS_PATH, clientPath, withNotice } from "./paths";
+import { isSameClientName } from "./duplicate-name";
+import { logClientFailure } from "./log";
+import { saveNotice } from "./notices";
+import { CLIENTS_PATH, clientPath, withNotice, type ClientNotice } from "./paths";
 import {
   deleteClient,
   findClientsWithSameName,
+  getClient,
   insertClient,
   listClients,
   updateClient,
@@ -55,12 +60,23 @@ const MESSAGES = {
   deleteReferenced: "אי אפשר למחוק לקוח שיש לו פרויקטים או הכנסות. אפשר להעביר אותו לארכיון.",
 } as const;
 
-/** Logs a failure without personal data: Postgres error details can contain row values. */
-function logFailure(action: string, error: unknown) {
-  const cause = error instanceof Error ? error.cause : undefined;
-  const code =
-    typeof cause === "object" && cause !== null && "code" in cause ? String(cause.code) : "none";
-  console.error(`clients: ${action} failed (code ${code})`);
+/**
+ * The notice for the card after a save: warns when other clients have the same name (owner
+ * decision: warn, never block). The save already succeeded, so a failed lookup only drops
+ * the warning.
+ */
+async function noticeAfterSave(
+  supabase: SupabaseClient,
+  saved: "created" | "updated",
+  name: string,
+  id: string,
+): Promise<ClientNotice> {
+  try {
+    return saveNotice(saved, await findClientsWithSameName(supabase, name, id));
+  } catch (error) {
+    logClientFailure("duplicate lookup after save", error);
+    return saved;
+  }
 }
 
 function revalidateClient(id: string) {
@@ -80,15 +96,17 @@ export async function createClientAction(
     return { values, fieldErrors: validation.fieldErrors, formError: null };
   }
 
+  const supabase = await createSupabaseServerClient();
   let id: string;
   try {
-    ({ id } = await insertClient(await createSupabaseServerClient(), validation.data));
+    ({ id } = await insertClient(supabase, validation.data));
   } catch (error) {
-    logFailure("create", error);
+    logClientFailure("create", error);
     return { values, fieldErrors: {}, formError: MESSAGES.saveFailed };
   }
+  const notice = await noticeAfterSave(supabase, "created", validation.data.name, id);
   revalidateClient(id);
-  redirect(withNotice(clientPath(id), "created"));
+  redirect(withNotice(clientPath(id), notice));
 }
 
 /** CLI-1: saves changes to a client and returns to its card. */
@@ -108,18 +126,24 @@ export async function updateClientAction(
     return { values, fieldErrors: validation.fieldErrors, formError: null };
   }
 
-  let found: boolean;
+  const supabase = await createSupabaseServerClient();
+  let previousName: string;
   try {
-    found = await updateClient(await createSupabaseServerClient(), clientId.data, validation.data);
+    // The name before the change: the duplicate warning is only for a changed name.
+    const previous = await getClient(supabase, clientId.data);
+    if (!previous || !(await updateClient(supabase, clientId.data, validation.data))) {
+      return { values, fieldErrors: {}, formError: MESSAGES.notFound };
+    }
+    previousName = previous.name;
   } catch (error) {
-    logFailure("update", error);
+    logClientFailure("update", error);
     return { values, fieldErrors: {}, formError: MESSAGES.saveFailed };
   }
-  if (!found) {
-    return { values, fieldErrors: {}, formError: MESSAGES.notFound };
-  }
+  const notice = isSameClientName(previousName, validation.data.name)
+    ? "updated"
+    : await noticeAfterSave(supabase, "updated", validation.data.name, clientId.data);
   revalidateClient(clientId.data);
-  redirect(withNotice(clientPath(clientId.data), "updated"));
+  redirect(withNotice(clientPath(clientId.data), notice));
 }
 
 async function setArchived(
@@ -138,7 +162,7 @@ async function setArchived(
       archived_at: archived ? new Date().toISOString() : null,
     });
   } catch (error) {
-    logFailure(archived ? "archive" : "restore", error);
+    logClientFailure(archived ? "archive" : "restore", error);
     return { message: null, error: MESSAGES.statusFailed };
   }
   if (!found) {
@@ -172,7 +196,7 @@ export async function deleteClientAction(id: string): Promise<ClientStatusState>
   try {
     result = await deleteClient(await createSupabaseServerClient(), clientId.data);
   } catch (error) {
-    logFailure("delete", error);
+    logClientFailure("delete", error);
     return { message: null, error: MESSAGES.deleteFailed };
   }
   if (result === "referenced") {
@@ -208,7 +232,7 @@ export async function searchClientsAction(input: {
   try {
     return { ok: true, page: await listClients(await createSupabaseServerClient(), parsed.data) };
   } catch (error) {
-    logFailure("search", error);
+    logClientFailure("search", error);
     return { ok: false };
   }
 }
@@ -236,7 +260,7 @@ export async function findDuplicateClientsAction(input: {
     );
     return { ok: true, clients };
   } catch (error) {
-    logFailure("duplicate lookup", error);
+    logClientFailure("duplicate lookup", error);
     return { ok: false };
   }
 }

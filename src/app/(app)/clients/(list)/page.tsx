@@ -11,13 +11,13 @@ import {
   NOTICE_PARAM,
   VIEW_PARAM,
 } from "@/lib/clients/paths";
-import { listClients, type ClientListView } from "@/lib/clients/queries";
+import { logClientFailure } from "@/lib/clients/log";
+import { clientNoticeMessage } from "@/lib/clients/notices";
+import { listClients, type ClientListPage, type ClientListView } from "@/lib/clients/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 import { ClientsBrowser } from "./clients-browser";
-
-const NOTICES: Record<string, string> = { deleted: "הלקוח נמחק." };
 
 const VIEWS: { view: ClientListView; label: string; href: string }[] = [
   { view: "active", label: "פעילים", href: CLIENTS_PATH },
@@ -29,14 +29,20 @@ export default async function ClientsPage({ searchParams }: PageProps<"/clients"
   await requireAllowedUser();
   const params = await searchParams;
   const view: ClientListView = params[VIEW_PARAM] === ARCHIVED_VIEW ? "archived" : "active";
-  const noticeKey = params[NOTICE_PARAM];
-  const notice = typeof noticeKey === "string" ? NOTICES[noticeKey] : undefined;
+  const notice = clientNoticeMessage(params[NOTICE_PARAM]);
 
-  const initialPage = await listClients(await createSupabaseServerClient(), {
-    view,
-    query: "",
-    offset: 0,
-  });
+  let initialPage: ClientListPage;
+  try {
+    initialPage = await listClients(await createSupabaseServerClient(), {
+      view,
+      query: "",
+      offset: 0,
+    });
+  } catch (error) {
+    // Logged by code only; the error boundary gets no database details (SPEC 8).
+    logClientFailure("list", error);
+    throw new Error("Could not load the client list");
+  }
 
   return (
     <section className="space-y-5">

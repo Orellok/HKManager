@@ -1,7 +1,10 @@
 name: CI
 
 on:
+  # Branches only: a tag (even one named "main") must not start CI and, through it, the
+  # staging migrations.
   push:
+    branches: ["**"]
   pull_request:
 
 permissions:
@@ -57,6 +60,8 @@ jobs:
       - name: Integration tests
         run: pnpm test:integration
 
+      # A build without Supabase values, as for any environment. The E2E webServer rebuilds the
+      # app with the local stack's public URL and anon key; building twice is intentional.
       - name: Build
         run: pnpm build
 

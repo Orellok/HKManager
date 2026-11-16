@@ -1,0 +1,20 @@
+# M1.2 – Projects (PRJ-1..3) + client card projects + M1.1 carry-overs
+
+Source: SPEC.md sections 0, 5.2 (CLI-2, CLI-4), 5.3 (PRJ-1..3), 5.12 (TASK-10 mentions archiving a project), 6 (`projects`), 7, 8, 10. Approved by the owner on 2026-11-16.
+
+## Acceptance criteria
+
+1. Migration creates `projects`: common fields, `client_id` (FK → clients, **ON DELETE RESTRICT**), `name`, `property_address`, `status`, `contract_amount` (bigint agorot, nullable), `start_date`, `end_date`, `notes`, and **`archived_at`** (owner-approved addition to SPEC 6, needed for TASK-10 archiving). Status values: `lead`, `active`, `on_hold`, `completed`, `cancelled`; default `lead`. Check constraints: `contract_amount >= 0`, `end_date >= start_date` when both set, text lengths. Indexes on `client_id`, dates, `status`. RLS via `is_allowed_user()`; column grants so users cannot set `id`/`created_by`/timestamps. The RLS guard test covers it.
+2. Shared zod schema (via `@/lib/zod`). Required: client, name, status. **Owner decision:** contract amount optional. Money input in shekels (accepts `12500`, `12,500`, `12,500.50`; max 2 decimals; non-negative; sane upper bound) converted to integer agorot with no float arithmetic; displayed as `₪12,500.50` (he-IL). Dates via the native date input, displayed DD/MM/YYYY; end date not before start date.
+3. PRJ-1: projects list, create/edit form, project card. "פרויקטים" added to the navigation. Every page and Server Action calls `requireAllowedUser()`.
+4. **Owner decision – list:** default shows `lead`, `active`, `on_hold`; `completed`/`cancelled` available via a status filter; archived via an archive filter. Sorted by last update. Search by project name or client name, server-side via POST (no personal data in URLs, as in M1.1). Bounded paging.
+5. PRJ-2: status selectable on create/edit, shown on list and card as text (not color alone).
+6. PRJ-3: the card shows client (link), property address, status, contract amount, dates, notes. "שולם"/"יתרה" arrive in M2, milestones in M1.3.
+7. **Owner decision – delete/archive:** a project with no milestones and no incomes can be permanently deleted after confirmation; otherwise only archived/restored (DB enforcement arrives with the milestone/income FKs in M1.3/M2). Archived projects hidden from the default list.
+8. **Owner decision – archived client:** a new project cannot be created for an archived client (server-enforced; UI explains and offers to restore the client first).
+9. Client card (CLI-4): shows the client's projects (name, status, amount) with "פרויקט חדש" pre-filled with the client. Deleting a client that has projects is blocked by the DB (FK RESTRICT) and the UI shows the existing "has projects – archive instead" message (CLI-2).
+10. M1.1 lessons applied from the start: inline errors with input kept on network/server failure; expired-session redirect; focus management (`pending` buttons); nonce CSP (no inline styles, zod jitless); duplicate-submit protection with a **ref-based in-flight guard** (not only transition state).
+11. M1.1 carry-overs (shared code): (a) `checkBrowserSession` returns "ended" only for `AuthSessionMissingError` or `AuthApiError` 401/403, "unknown" otherwise (429 no longer redirects); (b) the clients form also gets the ref-based in-flight guard; (c) an offline E2E (`context.setOffline(true)`) asserting inline error and no redirect.
+12. States, accessibility (WCAG 2.1 AA), RTL, no horizontal scroll at 360/412/1280.
+13. Tests: unit (schema, shekel↔agorot conversion incl. edge cases: 0, 0.01, large values, commas, invalid formats; date rule); integration (RLS on `projects`; FK restrict on client delete; archived-client rule; constraints); E2E on android and desktop for create/edit/status/search/filter/archive/restore/delete, client-card projects, blocked client delete, archived-client rule, network failure, offline. Test names include PRJ-1..3 / CLI-2 / CLI-4.
+14. Out of scope: milestones (M1.3), incomes/paid/balance (M2), tasks (M6).

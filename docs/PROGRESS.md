@@ -1,0 +1,31 @@
+# Progress log (resume point)
+
+Any session picking up this project: read this file first, then continue from "Next step".
+Workflow: `.claude/commands/feature.md` (senior-developer → code-reviewer → qa-engineer, max 3 fix rounds).
+Commit and push after every meaningful step.
+
+## Owner decisions (2026-11-15)
+- Profile filled from SPEC.md; unit tests: Vitest; package manager: pnpm.
+- Build order: M0 split into M0.1 Scaffold → M0.2 Supabase local + base migrations + allowed_users + RLS → M0.3 Auth (AUTH-1..5) → M0.4 CI → M0.5 Sentry. Then M1…M7 per SPEC section 11.
+- M0.1: criteria approved as written; shell has a title only (no nav); nonce-based CSP.
+- M0.1 copy approved: home h1 "דף הבית", 404 "הדף לא נמצא" / "הכתובת שביקשת אינה קיימת."
+- Permissions-Policy: camera stays blocked until M3; open camera=(self) as part of M3 (expense photo capture).
+- 2026-11-15: owner created Supabase projects hkmanager-staging and hkmanager-prod (Free plan → 2 free projects confirmed in practice). Refs recorded in docs/setup/environments.md.
+- Owner wants work committed continuously and resumed autonomously after interruptions.
+
+## Status
+| Feature | Status | Notes |
+|---|---|---|
+| M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
+| M0.3 Auth | DONE – review APPROVED, QA PASS, 2 fix rounds (prefetch auth bypass; hook fail-closed + /login redirect) | docs/specs/m0-3-auth.md |
+| M0.4 CI + migrations workflow | DONE – review APPROVED, QA PASS, 1 polish round; CI green on GitHub (runs 1-8). Staging/prod workflows verified by mocks only until first merge to main + secrets | docs/specs/m0-4-ci.md |
+| M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
+
+## Next step
+Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run).
+Then: draft M0.5 (Sentry) criteria for owner approval – needs owner Sentry account (free tier, SPEC 3/7) and DSN.
+Manual staging check (when Google OAuth + staging exist): allowlisted Google account is created and reaches home – confirms GoTrue sends user_metadata.email_verified (hook fails closed otherwise).
+Proposed split: M0.4 CI + Supabase migrations workflows; M0.5 Sentry; M0.6 Netlify staging/prod deploy (needs owner Netlify account + VERIFY-02).
+Carry into M0.3: CSP connect-src += Supabase URL; @types/node ^22; focus ring contrast fix; revisit enable_signup for Google OAuth; SQL-level test for missing/empty email claim; optional tests (normal emails accepted, ~3000-char email).
+Later (AUTH-5 UI): last-admin protection; trigger-enforced created_by/created_at.
+Environment: start Docker with `nohup dockerd >/tmp/dockerd.log 2>&1 &`; use SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io in the cloud sandbox.

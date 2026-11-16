@@ -93,7 +93,8 @@ commit SHA, and every workflow runs with read-only repository permissions.
 - The migrations workflows use a concurrency group per environment: runs never overlap; a newer
   queued run replaces an older queued one.
 - The staging workflow skips the migrate job when the commit is no longer the head of `main`
-  (the newer commit's run applies every pending migration). A skipped job never counts as a
+  (the newer commit's run applies every pending migration once its CI passes; if that CI fails,
+  staging waits for the next green commit on `main`). A skipped job never counts as a
   successful staging migration.
 - The production guard reads the staging runs through the Actions API (`actions: read`). Each
   staging run is titled `Staging migrations <commit SHA>`, and the guard requires a run with that

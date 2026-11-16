@@ -19,13 +19,13 @@ Commit and push after every meaningful step.
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
 | M0.3 Auth | DONE – review APPROVED, QA PASS, 2 fix rounds (prefetch auth bypass; hook fail-closed + /login redirect) | docs/specs/m0-3-auth.md |
 | M0.4 CI + migrations workflow | DONE – review APPROVED, QA PASS, 1 polish round; CI green on GitHub (runs 1-8). Staging/prod workflows verified by mocks only until first merge to main + secrets | docs/specs/m0-4-ci.md |
-| M1.1 Clients | review CHANGES_REQUIRED (duplicate warning missed on name-only save) – fix round 1 | docs/specs/m1-1-clients.md |
+| M1.1 Clients | fix round 1 done (134a43d..6839586) – in re-review | docs/specs/m1-1-clients.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run).
 Owner approved (2026-11-16): start M1 in parallel; split M1.1 Clients (CLI-1..4), M1.2 Projects (PRJ-1..3), M1.3 Milestones (MS-1..3, MS-6); MS-4/5 move to M2. M0.5 Sentry / M0.6 Netlify wait for owner accounts.
-Now: M1.1 fix round 1 (server-side duplicate notice after save; search/load-more race; notice announcement; 100-row limit test). Then re-review, then QA. Owner to confirm M1.1 Hebrew copy + choices (search on submit via POST, duplicate check on blur, phone rules, max lengths).
+Now: re-review M1.1 fix round 1 (diff 4f2b339..HEAD), then QA. Owner to confirm M1.1 Hebrew copy + choices (search on submit via POST, duplicate check on blur, phone rules, max lengths).
 Manual staging check (when Google OAuth + staging exist): allowlisted Google account is created and reaches home – confirms GoTrue sends user_metadata.email_verified (hook fails closed otherwise).
 Proposed split: M0.4 CI + Supabase migrations workflows; M0.5 Sentry; M0.6 Netlify staging/prod deploy (needs owner Netlify account + VERIFY-02).
 Carry into M0.3: CSP connect-src += Supabase URL; @types/node ^22; focus ring contrast fix; revisit enable_signup for Google OAuth; SQL-level test for missing/empty email claim; optional tests (normal emails accepted, ~3000-char email).

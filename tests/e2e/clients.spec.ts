@@ -424,7 +424,7 @@ test_.describe("M1.1-8: navigation", () => {
     const weights = await nav
       .getByRole("link")
       .evaluateAll((links) => links.map((link) => getComputedStyle(link).fontWeight));
-    expect(weights).toEqual(["400", "700", "400"]);
+    expect(weights).toEqual(["400", "700", "400", "400"]);
   });
 
   test_(

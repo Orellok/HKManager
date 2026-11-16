@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { ListView } from "@/lib/list-view";
+
 import { duplicateNameKey } from "./duplicate-name";
 import { phoneSearchDigits } from "./phone";
 import type { ClientInput } from "./schema";
@@ -18,7 +20,7 @@ export const CLIENTS_PAGE_SIZE = 25;
 /** Postgres foreign_key_violation: a row elsewhere (a project, an income) references it. */
 export const FOREIGN_KEY_VIOLATION = "23503";
 
-export type ClientListView = "active" | "archived";
+export type ClientListView = ListView;
 
 export type Client = {
   id: string;

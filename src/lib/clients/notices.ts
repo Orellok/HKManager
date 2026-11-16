@@ -1,3 +1,5 @@
+import { noticeMessage } from "@/lib/notices";
+
 import type { ClientNotice } from "./paths";
 import type { DuplicateClient } from "./queries";
 
@@ -14,9 +16,7 @@ export const CLIENT_NOTICE_MESSAGES: Record<ClientNotice, string> = {
 
 /** The message for a `?notice=` value, or undefined for a missing or unknown code. */
 export function clientNoticeMessage(code: unknown): string | undefined {
-  return typeof code === "string" && Object.hasOwn(CLIENT_NOTICE_MESSAGES, code)
-    ? CLIENT_NOTICE_MESSAGES[code as ClientNotice]
-    : undefined;
+  return noticeMessage(CLIENT_NOTICE_MESSAGES, code);
 }
 
 /**

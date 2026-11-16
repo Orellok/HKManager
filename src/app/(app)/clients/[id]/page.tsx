@@ -4,12 +4,8 @@ import { buttonClasses } from "@/components/button";
 import { RedirectNotice } from "@/components/redirect-notice";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { clientNoticeMessage } from "@/lib/clients/notices";
-import {
-  ARCHIVED_CLIENTS_PATH,
-  CLIENTS_PATH,
-  NOTICE_PARAM,
-  editClientPath,
-} from "@/lib/clients/paths";
+import { ARCHIVED_CLIENTS_PATH, CLIENTS_PATH, editClientPath } from "@/lib/clients/paths";
+import { NOTICE_PARAM } from "@/lib/notices";
 
 import { ClientStatusActions } from "./client-status-actions";
 import { loadClientOrNotFound } from "./load-client";
@@ -49,7 +45,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/c
         חזרה לרשימת הלקוחות
       </Link>
 
-      <RedirectNotice message={notice} param={NOTICE_PARAM} />
+      <RedirectNotice message={notice} />
 
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="min-w-0 text-2xl font-semibold wrap-anywhere">{client.name}</h1>

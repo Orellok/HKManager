@@ -2,33 +2,28 @@ import Link from "next/link";
 
 import { buttonClasses } from "@/components/button";
 import { RedirectNotice } from "@/components/redirect-notice";
+import { ViewTabs } from "@/components/view-tabs";
 import { requireAllowedUser } from "@/lib/auth/guards";
-import {
-  ARCHIVED_CLIENTS_PATH,
-  ARCHIVED_VIEW,
-  CLIENTS_PATH,
-  NEW_CLIENT_PATH,
-  NOTICE_PARAM,
-  VIEW_PARAM,
-} from "@/lib/clients/paths";
+import { ARCHIVED_CLIENTS_PATH, CLIENTS_PATH, NEW_CLIENT_PATH } from "@/lib/clients/paths";
 import { logClientFailure } from "@/lib/clients/log";
 import { clientNoticeMessage } from "@/lib/clients/notices";
 import { listClients, type ClientListPage, type ClientListView } from "@/lib/clients/queries";
+import { VIEW_PARAM, listViewFrom } from "@/lib/list-view";
+import { NOTICE_PARAM } from "@/lib/notices";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { cn } from "@/lib/utils";
 
 import { ClientsBrowser } from "./clients-browser";
 
-const VIEWS: { view: ClientListView; label: string; href: string }[] = [
-  { view: "active", label: "פעילים", href: CLIENTS_PATH },
-  { view: "archived", label: "ארכיון", href: ARCHIVED_CLIENTS_PATH },
-];
+const VIEWS = [
+  { key: "active", label: "פעילים", href: CLIENTS_PATH },
+  { key: "archived", label: "ארכיון", href: ARCHIVED_CLIENTS_PATH },
+] as const;
 
 /** CLI-1 / CLI-2 / CLI-3: the client list, active or archived, with search. */
 export default async function ClientsPage({ searchParams }: PageProps<"/clients">) {
   await requireAllowedUser();
   const params = await searchParams;
-  const view: ClientListView = params[VIEW_PARAM] === ARCHIVED_VIEW ? "archived" : "active";
+  const view: ClientListView = listViewFrom(params[VIEW_PARAM]);
   const notice = clientNoticeMessage(params[NOTICE_PARAM]);
 
   let initialPage: ClientListPage;
@@ -53,31 +48,9 @@ export default async function ClientsPage({ searchParams }: PageProps<"/clients"
         </Link>
       </div>
 
-      <RedirectNotice message={notice} param={NOTICE_PARAM} />
+      <RedirectNotice message={notice} />
 
-      <nav aria-label="תצוגת לקוחות">
-        <ul className="flex gap-2">
-          {VIEWS.map((item) => {
-            const current = item.view === view;
-            return (
-              <li key={item.view}>
-                <Link
-                  href={item.href}
-                  aria-current={current ? "page" : undefined}
-                  className={cn(
-                    "inline-flex min-h-11 items-center rounded-md border px-4 text-sm",
-                    current
-                      ? "bg-primary text-primary-foreground border-primary font-bold"
-                      : "hover:bg-accent",
-                  )}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <ViewTabs label="תצוגת לקוחות" tabs={VIEWS} current={view} />
 
       <ClientsBrowser key={view} view={view} initialPage={initialPage} />
     </section>

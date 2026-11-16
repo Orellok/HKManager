@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
-import { useActionState, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { Button, buttonClasses } from "@/components/button";
 import { TextInputField, TextareaField } from "@/components/form-field";
-import { redirectToLoginIfSessionEnded } from "@/lib/auth/action-failure";
+import { useServerForm } from "@/components/use-server-form";
 import {
   findDuplicateClientsAction,
   type ClientFormState,
@@ -18,8 +18,6 @@ import {
   CLIENT_FIELDS,
   readClientFormValues,
   validateClientInput,
-  type ClientField,
-  type ClientFieldErrors,
   type ClientFormValues,
 } from "@/lib/clients/schema";
 
@@ -33,18 +31,6 @@ type ClientFormProps = {
 };
 
 const DUPLICATE_WARNING_ID = "name-duplicate-warning";
-const FIX_FIELDS_MESSAGE = "לא ניתן לשמור. יש לתקן את השדות המסומנים.";
-const SAVE_UNAVAILABLE_MESSAGE = "לא ניתן לשמור כרגע. בדקו את החיבור ונסו שוב.";
-
-function firstInvalidField(errors: ClientFieldErrors): ClientField | undefined {
-  return CLIENT_FIELDS.find((field) => errors[field]);
-}
-
-function focusField(form: HTMLFormElement | null, field: ClientField | undefined) {
-  if (form && field) {
-    form.querySelector<HTMLElement>(`[name="${field}"]`)?.focus();
-  }
-}
 
 function duplicateWarningText(duplicates: DuplicateClient[]): string {
   const allArchived = duplicates.every((client) => client.archived_at !== null);
@@ -54,9 +40,8 @@ function duplicateWarningText(duplicates: DuplicateClient[]): string {
 }
 
 /**
- * CLI-1: create and edit form. Validated with the shared schema in the browser before
- * sending and again by the Server Action. Errors appear next to their field, focus moves to
- * the first invalid field, and what the user typed is kept.
+ * CLI-1: create and edit form (saving, validation, errors and failed requests: see
+ * useServerForm), with the duplicate-name warning (owner decision: warn, never block).
  */
 export function ClientForm({
   action,
@@ -65,61 +50,18 @@ export function ClientForm({
   submitLabel,
   cancelHref,
 }: ClientFormProps) {
-  // Without JavaScript (or before hydration) the form posts to the Server Action itself and
-  // this state holds its answer. With JavaScript, handleSubmit validates in the browser and
-  // calls the action directly, so a failed request can be caught and the input kept.
-  const [serverState, formAction] = useActionState(action, {
-    values: initialValues,
-    fieldErrors: {},
-    formError: null,
-  });
-  const [browserState, setBrowserState] = useState<ClientFormState | null>(null);
-  const [pending, startSave] = useTransition();
-  const [browserErrors, setBrowserErrors] = useState<ClientFieldErrors | null>(null);
+  const { formRef, formAction, handleSubmit, values, errors, formMessage, pending } = useServerForm(
+    {
+      action,
+      initialValues,
+      fields: CLIENT_FIELDS,
+      read: readClientFormValues,
+      validate: validateClientInput,
+    },
+  );
   const [duplicates, setDuplicates] = useState<DuplicateClient[]>([]);
   const [, startDuplicateCheck] = useTransition();
   const lastCheckedKey = useRef<string | null>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-
-  const state = browserState ?? serverState;
-  const errors = browserErrors ?? state.fieldErrors;
-  const hasErrors = firstInvalidField(errors) !== undefined;
-
-  // After the server answered with errors, move focus to the first invalid field.
-  useEffect(() => {
-    focusField(formRef.current, firstInvalidField(state.fieldErrors));
-  }, [state]);
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    // With JavaScript the save always runs here; the form action is the no-JavaScript path.
-    event.preventDefault();
-    if (pending) {
-      return;
-    }
-    const formData = new FormData(event.currentTarget);
-    const values = readClientFormValues(formData);
-    const validation = validateClientInput(values);
-    if (!validation.success) {
-      setBrowserErrors(validation.fieldErrors);
-      focusField(event.currentTarget, firstInvalidField(validation.fieldErrors));
-      return;
-    }
-    setBrowserErrors(null);
-    startSave(async () => {
-      try {
-        // On success the action redirects to the card; it returns only with errors.
-        setBrowserState(await action(state, formData));
-      } catch (error) {
-        unstable_rethrow(error);
-        if (await redirectToLoginIfSessionEnded()) {
-          return;
-        }
-        // The request failed (no connection, server error): nothing was saved. The fields
-        // were never reset, so everything the user typed is still in the form.
-        setBrowserState({ values, fieldErrors: {}, formError: SAVE_UNAVAILABLE_MESSAGE });
-      }
-    });
-  }
 
   function checkDuplicateName(name: string) {
     const key = duplicateNameKey(name);
@@ -154,8 +96,6 @@ export function ClientForm({
     });
   }
 
-  const values = state.values;
-
   return (
     <form
       ref={formRef}
@@ -165,7 +105,7 @@ export function ClientForm({
       className="max-w-xl space-y-5"
     >
       <p role="alert" className="text-destructive text-sm font-medium">
-        {state.formError ?? (hasErrors ? FIX_FIELDS_MESSAGE : null)}
+        {formMessage}
       </p>
 
       <div className="space-y-2">

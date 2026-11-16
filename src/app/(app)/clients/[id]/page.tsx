@@ -6,6 +6,8 @@ import { requireAllowedUser } from "@/lib/auth/guards";
 import { logClientFailure } from "@/lib/clients/log";
 import { clientNoticeMessage } from "@/lib/clients/notices";
 import { ARCHIVED_CLIENTS_PATH, CLIENTS_PATH, editClientPath } from "@/lib/clients/paths";
+import { getClientPaymentSummary, type ClientPaymentSummary } from "@/lib/incomes/queries";
+import { formatAgorot } from "@/lib/money";
 import { NOTICE_PARAM } from "@/lib/notices";
 import { listClientProjects, type ClientProject } from "@/lib/projects/queries";
 import type { ListPage } from "@/lib/paged-list";
@@ -17,19 +19,24 @@ import { loadClientOrNotFound } from "./load-client";
 
 type DetailRow = { label: string; value: string | null; href?: string; ltr?: boolean };
 
-/** CLI-4: the client card: details and projects. Total paid and balance come in M2. */
+/** CLI-4: the client card: details, total paid, open balance and projects. */
 export default async function ClientPage({ params, searchParams }: PageProps<"/clients/[id]">) {
   await requireAllowedUser();
   const client = await loadClientOrNotFound(params);
   const notice = clientNoticeMessage((await searchParams)[NOTICE_PARAM]);
   const isArchived = client.archived_at !== null;
   let projects: ListPage<ClientProject>;
+  let payments: ClientPaymentSummary;
   try {
-    projects = await listClientProjects(await createSupabaseServerClient(), client.id);
+    const supabase = await createSupabaseServerClient();
+    [projects, payments] = await Promise.all([
+      listClientProjects(supabase, client.id),
+      getClientPaymentSummary(supabase, client.id),
+    ]);
   } catch (error) {
     // Logged by code only; the error boundary gets no database details (SPEC 8).
-    logClientFailure("read projects", error);
-    throw new Error("Could not load the client's projects");
+    logClientFailure("read projects and payments", error);
+    throw new Error("Could not load the client's projects and payments");
   }
 
   const details: DetailRow[] = [
@@ -100,6 +107,24 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/c
           isArchived={isArchived}
         />
       </div>
+
+      <section aria-labelledby="client-payments-heading" className="space-y-3">
+        <h2 id="client-payments-heading" className="text-xl font-semibold">
+          תשלומים
+        </h2>
+        <dl className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground text-sm">סה״כ שולם</dt>
+            <dd className="text-xl font-semibold">{formatAgorot(payments.totalPaid)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-sm">
+              יתרה פתוחה באבני דרך (פרויקטים שאינם בארכיון)
+            </dt>
+            <dd className="text-xl font-semibold">{formatAgorot(payments.openBalance)}</dd>
+          </div>
+        </dl>
+      </section>
 
       <ClientProjects clientId={client.id} isClientArchived={isArchived} projects={projects} />
     </article>

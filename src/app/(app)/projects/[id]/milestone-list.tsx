@@ -19,6 +19,17 @@ import { editMilestonePath } from "@/lib/milestones/paths";
 import { moveTargetIndex, type MoveDirection } from "@/lib/milestones/reorder";
 import { MILESTONE_STATUS_LABELS, type MilestoneStatus } from "@/lib/milestones/status";
 
+/** A payment of a milestone as the card shows it, formatted on the server (MS-4, PRJ-3). */
+export type MilestonePaymentItem = {
+  id: string;
+  /** DD/MM/YYYY. */
+  receivedDate: string;
+  /** Formatted amount. */
+  amount: string;
+  paymentMethod: string;
+  editHref: string;
+};
+
 /** A milestone as the card shows it, formatted on the server. */
 export type MilestoneListItem = {
   id: string;
@@ -28,6 +39,13 @@ export type MilestoneListItem = {
   /** DD/MM/YYYY. */
   dueDate: string;
   status: MilestoneStatus;
+  /** Formatted amount paid so far. */
+  paid: string;
+  /** "יתרה: …" or "שולם ביתר: …". */
+  balanceText: string;
+  payments: readonly MilestonePaymentItem[];
+  /** MS-4: "רשום תשלום", or null for a cancelled milestone (owner decision). */
+  recordPaymentHref: string | null;
 };
 
 type MilestoneListProps = {
@@ -35,6 +53,8 @@ type MilestoneListProps = {
   items: readonly MilestoneListItem[];
   /** The section heading; focus goes there after a milestone is deleted. */
   headingId: string;
+  /** Shown instead of the list when the project has no milestones (also after a delete). */
+  emptyMessage: string;
 };
 
 type ActionKey = `${string}:${"up" | "down" | "cancel" | "restore" | "delete"}`;
@@ -61,8 +81,11 @@ function buttonId(milestoneId: string, action: "up" | "down" | "cancel" | "resto
  *   and still ask the database, which answers "already first/last" when nothing can move;
  * - after cancel / un-cancel, focus moves to the counterpart button of the same milestone;
  * - after delete, focus moves to the section heading.
+ *
+ * The live region and the focus handling stay mounted when the list becomes empty (the last
+ * milestone was deleted), so that delete is still announced and focus still moves.
  */
-export function MilestoneList({ projectId, items, headingId }: MilestoneListProps) {
+export function MilestoneList({ projectId, items, headingId, emptyMessage }: MilestoneListProps) {
   const [status, setStatus] = useState<ActionStatus>(NO_ACTION_STATUS);
   const [dialogError, setDialogError] = useState<{ key: ActionKey; error: string } | null>(null);
   const [busyKey, setBusyKey] = useState<ActionKey | null>(null);
@@ -162,7 +185,8 @@ export function MilestoneList({ projectId, items, headingId }: MilestoneListProp
         {status.message}
         {status.error ? <span className="text-destructive">{status.error}</span> : null}
       </p>
-      <ol aria-labelledby={headingId} className="divide-y rounded-lg border">
+      {items.length === 0 ? <p className="text-muted-foreground">{emptyMessage}</p> : null}
+      <ol aria-labelledby={headingId} className="divide-y rounded-lg border empty:hidden">
         {items.map((item, index) => {
           const isCancelled = item.status === "cancelled";
           return (
@@ -180,8 +204,47 @@ export function MilestoneList({ projectId, items, headingId }: MilestoneListProp
                 <span>
                   תאריך יעד: <span className="text-foreground">{item.dueDate}</span>
                 </span>
+                <span>
+                  שולם: <span className="text-foreground">{item.paid}</span>
+                </span>
+                <span className="text-foreground">{item.balanceText}</span>
               </p>
+              {item.payments.length > 0 ? (
+                <ul
+                  aria-label={`תשלומים: ${item.description}`}
+                  className="bg-muted/40 divide-y rounded-md border text-sm"
+                >
+                  {item.payments.map((payment) => (
+                    <li
+                      key={payment.id}
+                      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-1"
+                    >
+                      <span className="flex flex-wrap gap-x-3">
+                        <span>{payment.receivedDate}</span>
+                        <span className="font-medium">{payment.amount}</span>
+                        <span className="text-muted-foreground">{payment.paymentMethod}</span>
+                      </span>
+                      <Link
+                        href={payment.editHref}
+                        aria-label={`עריכת תשלום מ-${payment.receivedDate} על סך ${payment.amount}`}
+                        className="inline-flex min-h-11 items-center underline underline-offset-4"
+                      >
+                        עריכה
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <div className="flex flex-wrap gap-2">
+                {item.recordPaymentHref ? (
+                  <Link
+                    href={item.recordPaymentHref}
+                    aria-label={`רשום תשלום: ${item.description}`}
+                    className={buttonClasses("secondary")}
+                  >
+                    רשום תשלום
+                  </Link>
+                ) : null}
                 {(["up", "down"] as const).map((direction) => {
                   const key: ActionKey = `${item.id}:${direction}`;
                   const atEdge = moveTargetIndex(index, items.length, direction) === null;

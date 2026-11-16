@@ -14,6 +14,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/projects", label: "פרויקטים" },
   // Owner decision (M1.3): the open debts screen (MS-6).
   { href: "/debts", label: "חובות" },
+  // Owner decision (M2.1): the incomes screen (INC-1).
+  { href: "/incomes", label: "הכנסות" },
 ];
 
 function isCurrent(pathname: string, href: string): boolean {
@@ -42,9 +44,9 @@ export function AppNav() {
                 href={item.href}
                 aria-current={current ? "page" : undefined}
                 className={cn(
-                  "hover:bg-accent relative flex min-h-14 items-center justify-center px-4 text-sm transition-colors md:min-h-11 md:justify-start md:rounded-md",
+                  "hover:bg-accent relative flex min-h-14 items-center justify-center px-1 text-sm md:px-4 transition-colors md:min-h-11 md:justify-start md:rounded-md",
                   current
-                    ? "text-foreground font-bold before:bg-primary before:absolute before:inset-x-4 before:top-0 before:h-1 before:rounded-b-sm md:bg-accent md:before:inset-x-auto md:before:inset-y-2 md:before:start-0 md:before:h-auto md:before:w-1 md:before:rounded-sm"
+                    ? "text-foreground font-bold before:bg-primary before:absolute before:inset-x-2 before:top-0 before:h-1 before:rounded-b-sm md:bg-accent md:before:inset-x-auto md:before:inset-y-2 md:before:start-0 md:before:h-auto md:before:w-1 md:before:rounded-sm"
                     : "text-muted-foreground",
                 )}
               >

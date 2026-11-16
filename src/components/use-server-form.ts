@@ -77,7 +77,9 @@ export function useServerForm<Field extends string>({
     // With JavaScript the save always runs here; the form action is the no-JavaScript path.
     event.preventDefault();
     const form = event.currentTarget;
-    const formData = new FormData(form);
+    // The button that submitted, so its name and value are sent too (e.g. the confirm button
+    // of a save that needs confirmation), as a form submitted without JavaScript sends them.
+    const formData = new FormData(form, (event.nativeEvent as SubmitEvent).submitter);
     const values = read(formData);
     if (pending) {
       return;
@@ -106,5 +108,14 @@ export function useServerForm<Field extends string>({
     });
   }
 
-  return { formRef, formAction, handleSubmit, values: state.values, errors, formMessage, pending };
+  return {
+    formRef,
+    formAction,
+    handleSubmit,
+    values: state.values,
+    errors,
+    formMessage,
+    confirmation: state.confirmation,
+    pending,
+  };
 }

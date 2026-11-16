@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 
 import { createServiceRoleClient, expect, test } from "./support/auth-fixtures";
 
@@ -50,6 +50,61 @@ const test_ = test.extend<{ token: string; seedClient: (client: SeedClient) => P
 test_.beforeEach(async ({ signIn }) => {
   await signIn({ role: "owner" });
 });
+
+/**
+ * Records CSP violations from the first byte of every navigation, through the
+ * securitypolicyviolation event (as shell.spec.ts does) and console errors.
+ */
+async function trackCspViolations(page: Page): Promise<string[]> {
+  const violations: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && message.text().includes("Content Security Policy")) {
+      violations.push(message.text());
+    }
+  });
+  await page.exposeFunction("__reportCspViolation", (violation: string) => {
+    violations.push(violation);
+  });
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) => {
+      const report = (window as unknown as { __reportCspViolation: (v: string) => void })
+        .__reportCspViolation;
+      report(`${event.violatedDirective}: ${event.blockedURI} (${event.sourceFile})`);
+    });
+  });
+  return violations;
+}
+
+type FailureMode = "abort" | "500";
+
+/**
+ * Makes every Server Action request fail (a lost connection or a server error) until the
+ * returned function is called. Server Actions are POSTs carrying a Next-Action header.
+ */
+async function failServerActions(page: Page, mode: FailureMode): Promise<() => Promise<void>> {
+  const pattern = "**/*";
+  const handler = async (route: Route) => {
+    const request = route.request();
+    if (request.method() === "POST" && request.headers()["next-action"]) {
+      if (mode === "abort") {
+        await route.abort("internetdisconnected");
+      } else {
+        await route.fulfill({ status: 500, contentType: "text/plain", body: "error" });
+      }
+      return;
+    }
+    await route.continue();
+  };
+  await page.route(pattern, handler);
+  return () => page.unroute(pattern, handler);
+}
+
+function activeElementText(page: Page) {
+  return page.evaluate(() => {
+    const element = document.activeElement;
+    return element ? `${element.tagName}:${(element.textContent ?? "").trim()}` : "none";
+  });
+}
 
 function nameField(page: Page) {
   return page.getByRole("textbox", { name: /^שם/ });
@@ -502,12 +557,7 @@ test_.describe("M1.1-9: layout and states", () => {
   test_(
     "M1.1-9: no horizontal scroll and no CSP violations on the client screens",
     async ({ page, token, seedClient }, testInfo) => {
-      const violations: string[] = [];
-      page.on("console", (message) => {
-        if (message.type() === "error" && message.text().includes("Content Security Policy")) {
-          violations.push(message.text());
-        }
-      });
+      const violations = await trackCspViolations(page);
       const id = await seedClient({
         name: `שם ארוך מאוד מאוד ${"ארוך".repeat(20)} ${token}`,
         phone: "+972 50-123-4567",
@@ -530,6 +580,18 @@ test_.describe("M1.1-9: layout and states", () => {
           );
         }
       }
+      // Exercise the code that runs zod and the Server Actions in the browser as well.
+      await page.goto("/clients");
+      await searchFor(page, token);
+      await page.goto("/clients/new");
+      await nameField(page).fill(token);
+      await nameField(page).press("Tab");
+      await page.getByRole("textbox", { name: "מייל" }).fill("not-an-email");
+      await page.getByRole("button", { name: "שמירת לקוח" }).click();
+      await expect(page.getByRole("textbox", { name: "מייל" })).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      );
       await page.goto(`/clients/${id}`);
       await page.getByRole("button", { name: "מחיקה לצמיתות" }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
@@ -553,6 +615,229 @@ test_.describe("M1.1-9: layout and states", () => {
       );
       await searchFor(page, token);
       await expect(page.getByRole("status").filter({ hasText: "לא נמצאו" })).toBeVisible();
+    },
+  );
+});
+
+test_.describe("M1.1-3: failed requests keep the screen and the input", () => {
+  for (const mode of ["abort", "500"] as const) {
+    test_(
+      `CLI-1: a failed save (${mode}) shows an inline error and keeps the input`,
+      async ({ page, token }) => {
+        await page.goto("/clients/new");
+        await nameField(page).fill(`נכשל ${token}`);
+        await page.getByRole("textbox", { name: "טלפון" }).fill("050-1234567");
+        await page.getByRole("textbox", { name: "הערות" }).fill("שורה ראשונה\nשורה שנייה");
+        const restore = await failServerActions(page, mode);
+
+        await page.getByRole("button", { name: "שמירת לקוח" }).click();
+
+        await expect(page.getByRole("alert").first()).toHaveText(
+          "לא ניתן לשמור כרגע. בדקו את החיבור ונסו שוב.",
+        );
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText("לקוח חדש");
+        await expect(nameField(page)).toHaveValue(`נכשל ${token}`);
+        await expect(page.getByRole("textbox", { name: "טלפון" })).toHaveValue("050-1234567");
+        await expect(page.getByRole("textbox", { name: "הערות" })).toHaveValue(
+          "שורה ראשונה\nשורה שנייה",
+        );
+        await expect(page.getByRole("button", { name: "שמירת לקוח" })).not.toHaveAttribute(
+          "aria-disabled",
+          /.*/,
+        );
+
+        await restore();
+        await page.getByRole("button", { name: "שמירת לקוח" }).click();
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(`נכשל ${token}`);
+      },
+    );
+  }
+
+  test_(
+    "CLI-1: a failed duplicate check is ignored and keeps the input",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `כפול ${token}` });
+      await page.goto("/clients/new");
+      await page.getByRole("textbox", { name: "הערות" }).fill(`הערה ${token}`);
+      const restore = await failServerActions(page, "abort");
+
+      await nameField(page).fill(`כפול ${token}`);
+      await nameField(page).press("Tab");
+      await page.waitForLoadState("networkidle");
+
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("לקוח חדש");
+      await expect(page.getByText(/כבר קיים לקוח בשם הזה\. אפשר/)).toHaveCount(0);
+      await expect(nameField(page)).toHaveValue(`כפול ${token}`);
+      await expect(page.getByRole("textbox", { name: "הערות" })).toHaveValue(`הערה ${token}`);
+
+      // With the connection back, saving still works and the card warns about the duplicate.
+      await restore();
+      await page.getByRole("button", { name: "שמירת לקוח" }).click();
+      await expect(
+        page
+          .getByRole("status")
+          .filter({ hasText: "הלקוח נשמר. שימו לב: כבר קיים לקוח נוסף בשם הזה." }),
+      ).toBeVisible();
+    },
+  );
+
+  test_(
+    "CLI-3: a failed search shows the inline search error and keeps the query",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `חיפוש ${token}` });
+      await page.goto("/clients");
+      const restore = await failServerActions(page, "500");
+
+      await page.getByRole("searchbox", { name: "חיפוש לפי שם או טלפון" }).fill(token);
+      await page.getByRole("button", { name: "חיפוש", exact: true }).click();
+
+      await expect(
+        page.getByRole("alert").filter({ hasText: "החיפוש נכשל. אפשר לנסות שוב." }),
+      ).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("לקוחות");
+      await expect(page.getByRole("searchbox", { name: "חיפוש לפי שם או טלפון" })).toHaveValue(
+        token,
+      );
+
+      await restore();
+      await page.getByRole("button", { name: "חיפוש", exact: true }).click();
+      await expect(page.getByRole("status").filter({ hasText: "נמצא לקוח אחד." })).toBeVisible();
+      await expect(page.getByRole("alert").filter({ hasText: "החיפוש נכשל" })).toHaveCount(0);
+    },
+  );
+
+  test_(
+    "CLI-2: a failed archive shows an inline error and changes nothing",
+    async ({ page, token, seedClient }) => {
+      const id = await seedClient({ name: `ארכוב נכשל ${token}` });
+      await page.goto(`/clients/${id}`);
+      const restore = await failServerActions(page, "abort");
+
+      await page.getByRole("button", { name: "העברה לארכיון" }).click();
+
+      await expect(
+        page.getByRole("status").filter({ hasText: "הפעולה לא בוצעה. בדקו את החיבור ונסו שוב." }),
+      ).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(`ארכוב נכשל ${token}`);
+      await expect(page.getByText("בארכיון", { exact: true })).toHaveCount(0);
+
+      await restore();
+      await page.getByRole("button", { name: "העברה לארכיון" }).click();
+      await expect(
+        page.getByRole("status").filter({ hasText: "הלקוח הועבר לארכיון." }),
+      ).toBeVisible();
+    },
+  );
+
+  test_(
+    "CLI-2: a failed delete shows the error inside the dialog",
+    async ({ page, token, seedClient }) => {
+      const id = await seedClient({ name: `מחיקה נכשלה ${token}` });
+      await page.goto(`/clients/${id}`);
+      const restore = await failServerActions(page, "500");
+
+      await page.getByRole("button", { name: "מחיקה לצמיתות" }).click();
+      const dialog = page.getByRole("dialog", { name: "למחוק את הלקוח לצמיתות?" });
+      await dialog.getByRole("button", { name: "מחיקה לצמיתות" }).click();
+
+      await expect(dialog.getByRole("alert")).toHaveText(
+        "הפעולה לא בוצעה. בדקו את החיבור ונסו שוב.",
+      );
+      await expect(dialog.getByRole("button", { name: "מחיקה לצמיתות" })).toBeFocused();
+      await restore();
+    },
+  );
+});
+
+test_.describe("M1.1-9: keyboard focus after actions", () => {
+  test_(
+    "CLI-3: load more keeps focus on the button, then moves it to the first new client",
+    async ({ page, token }) => {
+      const { error } = await createServiceRoleClient()
+        .from("clients")
+        .insert(
+          Array.from({ length: 55 }, (_, index) => ({
+            name: `${token} K${String(index).padStart(2, "0")}`,
+          })),
+        );
+      expect(error).toBeNull();
+      await page.goto("/clients");
+      await searchFor(page, token);
+      const more = page.getByRole("button", { name: "הצגת לקוחות נוספים" });
+
+      await more.focus();
+      await page.keyboard.press("Enter");
+      await expect(clientList(page).getByRole("link")).toHaveCount(50);
+      await expect(more).toBeFocused();
+
+      await page.keyboard.press("Enter");
+      await expect(clientList(page).getByRole("link")).toHaveCount(55);
+      await expect(more).toHaveCount(0);
+      await expect(clientList(page).getByRole("link", { name: `${token} K50` })).toBeFocused();
+    },
+  );
+
+  test_(
+    "CLI-3: the search button keeps focus after searching",
+    async ({ page, token, seedClient }) => {
+      await seedClient({ name: `מיקוד ${token}` });
+      await page.goto("/clients");
+      await page.getByRole("searchbox", { name: "חיפוש לפי שם או טלפון" }).fill(token);
+      const button = page.getByRole("button", { name: "חיפוש", exact: true });
+
+      await button.focus();
+      await page.keyboard.press("Enter");
+
+      await expect(page.getByRole("status").filter({ hasText: "נמצא לקוח אחד." })).toBeVisible();
+      await expect(button).toBeFocused();
+      expect(await activeElementText(page)).toBe("BUTTON:חיפוש");
+    },
+  );
+
+  test_(
+    "CLI-2: after archiving, focus is on the restore button, and back",
+    async ({ page, token, seedClient }) => {
+      const id = await seedClient({ name: `מיקוד ארכיון ${token}` });
+      await page.goto(`/clients/${id}`);
+
+      await page.getByRole("button", { name: "העברה לארכיון" }).focus();
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("status").filter({ hasText: "הלקוח הועבר לארכיון." }),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "שחזור מהארכיון" })).toBeFocused();
+
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("status").filter({ hasText: "הלקוח הוחזר מהארכיון." }),
+      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "העברה לארכיון" })).toBeFocused();
+      expect(await activeElementText(page)).toBe("BUTTON:העברה לארכיון");
+    },
+  );
+});
+
+test_.describe("CLI-1: line breaks in notes", () => {
+  test_(
+    "CLI-1: notes of 2000 characters with line breaks are saved with \\n",
+    async ({ page, token }) => {
+      // 19 line breaks; 2000 characters as the browser counts them.
+      const notes = `${"ג".repeat(99)}\n`.repeat(19) + "ג".repeat(2000 - 19 * 100);
+      await page.goto("/clients/new");
+      await nameField(page).fill(`הערות ${token}`);
+      await page.getByRole("textbox", { name: "הערות" }).fill(notes);
+      await expect(page.getByRole("textbox", { name: "הערות" })).toHaveValue(notes);
+
+      await page.getByRole("button", { name: "שמירת לקוח" }).click();
+
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(`הערות ${token}`);
+      const { data, error } = await createServiceRoleClient()
+        .from("clients")
+        .select("notes")
+        .eq("name", `הערות ${token}`)
+        .single();
+      expect(error).toBeNull();
+      expect(data?.notes).toBe(notes);
     },
   );
 });

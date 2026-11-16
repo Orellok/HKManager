@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Button, buttonClasses } from "@/components/button";
 import { checkDateInputs } from "@/components/check-date-inputs";
 import { SelectField, TextInputField, TextareaField } from "@/components/form-field";
+import { useHydrated } from "@/components/use-hydrated";
 import { useServerForm } from "@/components/use-server-form";
 import { callServerAction } from "@/lib/auth/action-failure";
 import { MIN_ISO_DATE, todayInJerusalem } from "@/lib/dates";
@@ -129,6 +130,12 @@ export function IncomeForm({
     fillAmountFromMilestone && initialValues.milestone_id !== "" ? initialValues.amount : null,
   );
   const confirmationRef = useRef<HTMLDivElement>(null);
+  /**
+   * Client, project and milestone are controlled and linked through JavaScript; a choice made
+   * before hydration would be reset by it. Until then they are disabled, and hidden inputs
+   * carry their initial values, so a form sent without JavaScript keeps them.
+   */
+  const hydrated = useHydrated();
 
   // MS-5: the warning appears after a save attempt; focus moves to it so it is read first.
   useEffect(() => {
@@ -236,6 +243,13 @@ export function IncomeForm({
       <p role="alert" className="text-destructive text-sm font-medium">
         {formMessage}
       </p>
+      {hydrated ? null : (
+        <>
+          <input type="hidden" name="client_id" value={clientId} />
+          <input type="hidden" name="project_id" value={projectId} />
+          <input type="hidden" name="milestone_id" value={milestoneId} />
+        </>
+      )}
 
       <SelectField
         name="client_id"
@@ -246,6 +260,7 @@ export function IncomeForm({
         options={clientSelectOptions}
         value={clientId}
         onChange={changeClient}
+        disabled={!hydrated}
         error={errors.client_id}
       />
       <p role="status" className="text-destructive text-sm empty:sr-only">
@@ -260,6 +275,7 @@ export function IncomeForm({
         options={projectOptions}
         value={projectId}
         onChange={changeProject}
+        disabled={!hydrated}
         error={errors.project_id}
       />
       <SelectField
@@ -271,6 +287,7 @@ export function IncomeForm({
         options={milestoneOptions}
         value={milestoneId}
         onChange={changeMilestone}
+        disabled={!hydrated}
         error={errors.milestone_id}
       />
       <TextInputField

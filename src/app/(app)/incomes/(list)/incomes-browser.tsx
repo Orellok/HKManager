@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { Button, buttonClasses } from "@/components/button";
+import { useHydrated } from "@/components/use-hydrated";
 import { useGuardedTransition } from "@/components/use-guarded-transition";
 import { callServerAction } from "@/lib/auth/action-failure";
 import { formatIsoDate } from "@/lib/dates";
@@ -69,6 +70,9 @@ export function IncomesBrowser({
   const listRef = useRef<HTMLUListElement>(null);
   const focusItemAfterLoad = useRef<number | null>(null);
   const busy = filterPending || morePending;
+  // The filters only work through JavaScript, and a month typed before hydration would be
+  // reset to the current month by it; they are disabled until the page is interactive.
+  const hydrated = useHydrated();
 
   // The "load more" button disappears with the last page; keyboard focus moves to the first
   // newly loaded income instead of falling back to <body>.
@@ -181,6 +185,7 @@ export function IncomesBrowser({
           </label>
           <input
             id="incomes-month"
+            disabled={!hydrated}
             name="month"
             type="month"
             min={MIN_MONTH}
@@ -203,6 +208,7 @@ export function IncomesBrowser({
           </label>
           <select
             id="incomes-client"
+            disabled={!hydrated}
             name="client"
             value={clientId}
             onChange={changeClient}

@@ -376,14 +376,24 @@ describe("search_clients", () => {
     expect([...first, ...second]).toEqual([active.id, other.id]);
   });
 
-  it("CLI-3: never returns more than 100 rows", async () => {
+  it("CLI-3: returns at most 100 rows even when more match", async () => {
+    const bulkKey = `bulk-${randomUUID()}`;
+    const { error: seedError } = await service.from(TABLE).insert(
+      Array.from({ length: 101 }, (_, index) => ({
+        name: `${bulkKey} ${String(index).padStart(3, "0")}`,
+        notes: MARKER,
+      })),
+    );
+    expect(seedError).toBeNull();
+
     const { data, error } = await owner.client.rpc("search_clients", {
       p_archived: false,
+      p_name_query: bulkKey,
       p_limit: 1_000_000,
     });
 
     expect(error).toBeNull();
-    expect((data as ClientRow[]).length).toBeLessThanOrEqual(100);
+    expect((data as ClientRow[]).length).toBe(100);
   });
 });
 

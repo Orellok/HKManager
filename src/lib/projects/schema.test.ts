@@ -137,6 +137,9 @@ describe("project schema", () => {
     ["start_date", "1899-12-31"],
     ["start_date", "2101-01-01"],
     ["end_date", "2101-01-01"],
+    // M1.3-10: years 0001–0099 are real years, not the 1900s.
+    ["start_date", "0001-01-01"],
+    ["end_date", "0099-12-31"],
   ] as const)("PRJ-1: rejects the %s %j as out of range", (field, date) => {
     expect(fieldErrors(values({ [field]: date }))).toEqual({
       [field]: PROJECT_FIELD_MESSAGES.dateOutOfRange,

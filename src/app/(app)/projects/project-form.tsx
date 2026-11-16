@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { Button, buttonClasses } from "@/components/button";
+import { checkDateInputs } from "@/components/check-date-inputs";
 import { SelectField, TextInputField, TextareaField } from "@/components/form-field";
 import { useServerForm } from "@/components/use-server-form";
 import type { ProjectFormState } from "@/lib/projects/actions";
@@ -10,10 +11,8 @@ import { MAX_ISO_DATE, MIN_ISO_DATE } from "@/lib/dates";
 import { CLIENT_OPTIONS_LIMIT, type ClientOption } from "@/lib/projects/queries";
 import {
   PROJECT_FIELDS,
-  PROJECT_FIELD_MESSAGES,
   readProjectFormValues,
   validateProjectInput,
-  type ProjectFieldErrors,
   type ProjectFormValues,
 } from "@/lib/projects/schema";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS } from "@/lib/projects/status";
@@ -32,20 +31,10 @@ type ProjectFormProps = {
 const REQUIRED = "(חובה)";
 const DATE_FIELDS = ["start_date", "end_date"] as const;
 
-/**
- * A date input with a partly typed date (e.g. day and month without a year) submits "",
- * which would silently drop the date; the browser flags it as validity.badInput.
- */
-function checkDateInputs(form: HTMLFormElement): ProjectFieldErrors {
-  const errors: ProjectFieldErrors = {};
-  for (const field of DATE_FIELDS) {
-    const input = form.elements.namedItem(field);
-    if (input instanceof HTMLInputElement && input.validity.badInput) {
-      errors[field] = PROJECT_FIELD_MESSAGES.dateInvalid;
-    }
-  }
-  return errors;
+function checkProjectDateInputs(form: HTMLFormElement) {
+  return checkDateInputs(form, DATE_FIELDS);
 }
+
 const MORE_CLIENTS_HINT = `מוצגים ${CLIENT_OPTIONS_LIMIT} הלקוחות הפעילים הראשונים לפי שם. ללקוח אחר אפשר לפתוח פרויקט מכרטיס הלקוח.`;
 
 const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({
@@ -73,7 +62,7 @@ export function ProjectForm({
       fields: PROJECT_FIELDS,
       read: readProjectFormValues,
       validate: validateProjectInput,
-      checkControls: checkDateInputs,
+      checkControls: checkProjectDateInputs,
     },
   );
 

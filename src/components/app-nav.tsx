@@ -12,6 +12,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/", label: "בית" },
   { href: "/clients", label: "לקוחות" },
   { href: "/projects", label: "פרויקטים" },
+  // Owner decision (M1.3): the open debts screen (MS-6).
+  { href: "/debts", label: "חובות" },
 ];
 
 function isCurrent(pathname: string, href: string): boolean {

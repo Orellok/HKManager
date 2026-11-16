@@ -8,6 +8,10 @@ type ConfirmDialogProps = {
   /** Label of the button that opens the dialog. */
   triggerLabel: string;
   triggerVariant?: ButtonVariant;
+  /** A fuller accessible name when several triggers share a label (it must contain it). */
+  triggerAriaLabel?: string;
+  /** Id of the trigger, for moving focus to it after a related action. */
+  triggerId?: string;
   title: string;
   description: string;
   confirmLabel: string;
@@ -27,6 +31,8 @@ type ConfirmDialogProps = {
 export function ConfirmDialog({
   triggerLabel,
   triggerVariant = "destructive",
+  triggerAriaLabel,
+  triggerId,
   title,
   description,
   confirmLabel,
@@ -53,7 +59,14 @@ export function ConfirmDialog({
 
   return (
     <>
-      <Button ref={triggerRef} variant={triggerVariant} onClick={open} aria-haspopup="dialog">
+      <Button
+        ref={triggerRef}
+        id={triggerId}
+        variant={triggerVariant}
+        onClick={open}
+        aria-haspopup="dialog"
+        aria-label={triggerAriaLabel}
+      >
         {triggerLabel}
       </Button>
       <dialog

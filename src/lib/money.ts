@@ -119,3 +119,21 @@ export function agorotFromDb(value: unknown): number | null {
   }
   return agorot;
 }
+
+/**
+ * A sum of amounts read from the database (e.g. the total of open debts). It can exceed
+ * MAX_AGOROT but must be a non-negative safe integer: a larger value would have lost
+ * precision in JSON and is rejected rather than shown wrong.
+ */
+export function agorotTotalFromDb(value: unknown): number {
+  const agorot =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^\d+$/.test(value)
+        ? Number(value)
+        : NaN;
+  if (!Number.isSafeInteger(agorot) || agorot < 0) {
+    throw new RangeError("The database returned a total outside the supported range");
+  }
+  return agorot;
+}

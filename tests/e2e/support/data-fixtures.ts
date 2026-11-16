@@ -23,10 +23,21 @@ export type SeedProject = {
   archived_at?: string;
 };
 
+export type SeedMilestone = {
+  project_id: string;
+  description: string;
+  /** Agorot. */
+  amount: number;
+  due_date: string;
+  cancelled_at?: string;
+};
+
 type DataFixtures = {
   token: string;
   seedClient: (client: SeedClient) => Promise<string>;
   seedProject: (project: SeedProject) => Promise<string>;
+  /** Milestones go last in their project's list, in the order they are seeded. */
+  seedMilestone: (milestone: SeedMilestone) => Promise<string>;
 };
 
 async function insertRow(table: string, row: object): Promise<string> {
@@ -44,7 +55,8 @@ async function insertRow(table: string, row: object): Promise<string> {
 /**
  * Each test gets a unique token to put inside every client and project name it creates, so
  * parallel tests and leftovers never collide, and cleanup deletes exactly its own rows:
- * projects first (clients are ON DELETE RESTRICT), including any project of its clients.
+ * milestones of its projects first, then projects (both are ON DELETE RESTRICT), including
+ * any project of its clients, then clients.
  */
 export const test_ = test.extend<DataFixtures>({
   token: async ({}, provide) => {
@@ -59,13 +71,29 @@ export const test_ = test.extend<DataFixtures>({
       throw new Error("Could not find E2E clients to clean up", { cause: clientsError });
     }
     const clientIds = (clients ?? []).map((client) => client.id as string);
-    const byName = await service.from("projects").delete().ilike("name", `%${token}%`);
-    const byClient =
-      clientIds.length > 0
-        ? await service.from("projects").delete().in("client_id", clientIds)
+    const { data: projects, error: projectsError } = await service
+      .from("projects")
+      .select("id")
+      .or(
+        [
+          `name.ilike.%${token}%`,
+          ...(clientIds.length > 0 ? [`client_id.in.(${clientIds})`] : []),
+        ].join(","),
+      );
+    if (projectsError) {
+      throw new Error("Could not find E2E projects to clean up", { cause: projectsError });
+    }
+    const projectIds = (projects ?? []).map((project) => project.id as string);
+    const milestones =
+      projectIds.length > 0
+        ? await service.from("milestones").delete().in("project_id", projectIds)
+        : { error: null };
+    const byProject =
+      projectIds.length > 0
+        ? await service.from("projects").delete().in("id", projectIds)
         : { error: null };
     const byClientName = await service.from("clients").delete().ilike("name", `%${token}%`);
-    const error = byName.error ?? byClient.error ?? byClientName.error;
+    const error = milestones.error ?? byProject.error ?? byClientName.error;
     if (error) {
       throw new Error("Could not clean up E2E rows", { cause: error });
     }
@@ -75,6 +103,9 @@ export const test_ = test.extend<DataFixtures>({
   },
   seedProject: async ({}, provide) => {
     await provide((project) => insertRow("projects", project));
+  },
+  seedMilestone: async ({}, provide) => {
+    await provide((milestone) => insertRow("milestones", milestone));
   },
 });
 

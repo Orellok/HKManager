@@ -7,6 +7,17 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   prettier,
+  {
+    // zod must be configured jitless before use (CSP); see src/lib/zod.ts.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/lib/zod.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { paths: [{ name: "zod", message: 'Import { z } from "@/lib/zod" instead.' }] },
+      ],
+    },
+  },
   globalIgnores([
     ".next/**",
     "out/**",

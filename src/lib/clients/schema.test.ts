@@ -4,6 +4,7 @@ import {
   CLIENT_FIELD_MAX_LENGTH,
   CLIENT_FIELD_MESSAGES,
   EMPTY_CLIENT_FORM_VALUES,
+  normalizeLineBreaks,
   readClientFormValues,
   validateClientInput,
   type ClientFormValues,
@@ -133,6 +134,41 @@ describe("client schema", () => {
       phone: CLIENT_FIELD_MESSAGES.phoneInvalid,
       email: CLIENT_FIELD_MESSAGES.emailInvalid,
     });
+  });
+});
+
+describe("line breaks", () => {
+  it.each([
+    ["a\r\nb", "a\nb"],
+    ["a\rb", "a\nb"],
+    ["a\nb", "a\nb"],
+  ])("CLI-1: normalizes %j to %j", (input, output) => {
+    expect(normalizeLineBreaks(input)).toBe(output);
+  });
+
+  it("CLI-1: notes the browser counts as 2000 characters pass when submitted with \\r\\n", () => {
+    // 19 line breaks: 2000 characters as typed, 2019 as a browser submits them.
+    const typed = `${"ג".repeat(99)}\n`.repeat(19) + "ג".repeat(2000 - 19 * 100);
+    expect(typed).toHaveLength(CLIENT_FIELD_MAX_LENGTH.notes);
+    const submitted = typed.replaceAll("\n", "\r\n");
+
+    const result = validateClientInput(values({ notes: submitted }));
+
+    expect(result.success && result.data.notes).toBe(typed);
+  });
+
+  it("CLI-1: a note over the limit after normalizing is still rejected", () => {
+    const submitted = `${"ג".repeat(2000)}\r\nג`;
+
+    expect(fieldErrors(values({ notes: submitted }))).toEqual({
+      notes: CLIENT_FIELD_MESSAGES.notesTooLong,
+    });
+  });
+
+  it("CLI-1: trailing line breaks are trimmed after normalizing", () => {
+    const result = validateClientInput(values({ notes: "שורה\r\n\r\n" }));
+
+    expect(result.success && result.data.notes).toBe("שורה");
   });
 });
 

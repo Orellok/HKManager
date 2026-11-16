@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 /**
  * The client form schema (CLI-1), shared by the form in the browser and the Server Actions.
@@ -34,6 +34,22 @@ export const CLIENT_FIELD_MESSAGES = {
 
 const emptyToNull = (value: string): string | null => (value === "" ? null : value);
 
+/**
+ * Line breaks as "\n". A browser counts a textarea line break as one character but submits
+ * it as "\r\n", so without this the server would count more characters than the form did
+ * (and store "\r\n"). Applied before trimming and the length checks.
+ */
+export function normalizeLineBreaks(value: string): string {
+  return value.replace(/\r\n?/g, "\n");
+}
+
+function withNormalizedLineBreaks<Schema extends z.ZodType>(schema: Schema) {
+  return z.preprocess(
+    (value) => (typeof value === "string" ? normalizeLineBreaks(value) : value),
+    schema,
+  );
+}
+
 function optionalText(field: ClientField, tooLong: string) {
   return z.string().trim().max(CLIENT_FIELD_MAX_LENGTH[field], { error: tooLong });
 }
@@ -41,23 +57,33 @@ function optionalText(field: ClientField, tooLong: string) {
 const emailFormat = z.email();
 
 export const clientInputSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, { error: CLIENT_FIELD_MESSAGES.nameRequired })
-    .max(CLIENT_FIELD_MAX_LENGTH.name, { error: CLIENT_FIELD_MESSAGES.nameTooLong }),
-  phone: optionalText("phone", CLIENT_FIELD_MESSAGES.phoneTooLong)
-    .refine((value) => value === "" || PHONE_PATTERN.test(value), {
-      error: CLIENT_FIELD_MESSAGES.phoneInvalid,
-    })
-    .transform(emptyToNull),
-  email: optionalText("email", CLIENT_FIELD_MESSAGES.emailTooLong)
-    .refine((value) => value === "" || emailFormat.safeParse(value).success, {
-      error: CLIENT_FIELD_MESSAGES.emailInvalid,
-    })
-    .transform(emptyToNull),
-  address: optionalText("address", CLIENT_FIELD_MESSAGES.addressTooLong).transform(emptyToNull),
-  notes: optionalText("notes", CLIENT_FIELD_MESSAGES.notesTooLong).transform(emptyToNull),
+  name: withNormalizedLineBreaks(
+    z
+      .string()
+      .trim()
+      .min(1, { error: CLIENT_FIELD_MESSAGES.nameRequired })
+      .max(CLIENT_FIELD_MAX_LENGTH.name, { error: CLIENT_FIELD_MESSAGES.nameTooLong }),
+  ),
+  phone: withNormalizedLineBreaks(
+    optionalText("phone", CLIENT_FIELD_MESSAGES.phoneTooLong)
+      .refine((value) => value === "" || PHONE_PATTERN.test(value), {
+        error: CLIENT_FIELD_MESSAGES.phoneInvalid,
+      })
+      .transform(emptyToNull),
+  ),
+  email: withNormalizedLineBreaks(
+    optionalText("email", CLIENT_FIELD_MESSAGES.emailTooLong)
+      .refine((value) => value === "" || emailFormat.safeParse(value).success, {
+        error: CLIENT_FIELD_MESSAGES.emailInvalid,
+      })
+      .transform(emptyToNull),
+  ),
+  address: withNormalizedLineBreaks(
+    optionalText("address", CLIENT_FIELD_MESSAGES.addressTooLong).transform(emptyToNull),
+  ),
+  notes: withNormalizedLineBreaks(
+    optionalText("notes", CLIENT_FIELD_MESSAGES.notesTooLong).transform(emptyToNull),
+  ),
 });
 
 /** What the user typed, as strings; kept so a failed save never loses input. */

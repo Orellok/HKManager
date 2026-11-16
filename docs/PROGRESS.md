@@ -13,6 +13,7 @@ Commit and push after every meaningful step.
 - 2026-11-15: owner created Supabase projects hkmanager-staging and hkmanager-prod (Free plan → 2 free projects confirmed in practice). Refs recorded in docs/setup/environments.md.
 - 2026-11-16: owner approved M1.1 Hebrew copy and choices (search on submit via POST, duplicate check on blur + post-save notice, phone rules, max lengths).
 - 2026-11-16: owner approved M1.1 round-2 copy ("לא ניתן לשמור כרגע…", "הפעולה לא בוצעה…", "לא הצלחנו לטעון את הדף").
+- 2026-11-16: owner approved M1.2 copy and bounds (₪ after number per he-IL, ₪99,999,999.99 max, dates 1900–2100, 500-client hint wording, 50 projects on client card, range/digit messages).
 - Owner wants work committed continuously and resumed autonomously after interruptions.
 
 ## Status
@@ -30,7 +31,7 @@ Commit and push after every meaningful step.
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run); (5) Netlify account + 2 sites + NETLIFY_AUTH_TOKEN (docs/setup/netlify.md).
 VERIFY-02 checked 2026-11-16 (docs/verify/VERIFY-02-netlify.md): commercial use OK, Next 16 supported; OPEN: proxy.ts (Node runtime) on Netlify – gate on first staging deploy; credit budget (hard pause).
 Owner approved (2026-11-16): start M1 in parallel; split M1.1 Clients (CLI-1..4), M1.2 Projects (PRJ-1..3), M1.3 Milestones (MS-1..3, MS-6); MS-4/5 move to M2. M0.5 Sentry / M0.6 Netlify wait for owner accounts.
-Now: run senior-developer on M1.3, then review, then QA. Owner still to confirm M1.2 copy/bounds (₪ after number, ₪99,999,999.99 max, 1900–2100, 500-client hint, 50 projects on card, range/digit messages).
+Now: run senior-developer on M1.3, then review, then QA.
 Carry into M1.3: isIsoDate uses Date.UTC which maps years 0–99 to 1900s → years 0001–0099 get generic date message instead of range message (use setUTCFullYear). Lead decision: no-JS partial date saved as empty is acceptable (PWA on Chrome always runs JS). Owner to confirm M1.2 Hebrew copy + bounds. Lead concern: criterion 11(a) too narrow – invalid refresh token (AuthApiError 400) should count as 'ended'; only 429/5xx/network = 'unknown'.
 Carry into M1.2: checkBrowserSession should return 'ended' only for AuthSessionMissingError or AuthApiError 401/403 (429 currently causes a false redirect); add offline E2E (context.setOffline) asserting no redirect; ref-based in-flight guard in client form (synchronous scripted triple click creates 3 rows). Owner to confirm M1.1 Hebrew copy + choices (search on submit via POST, duplicate check on blur, phone rules, max lengths).
 Manual staging check (when Google OAuth + staging exist): allowlisted Google account is created and reaches home – confirms GoTrue sends user_metadata.email_verified (hook fails closed otherwise).

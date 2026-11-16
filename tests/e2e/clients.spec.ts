@@ -406,8 +406,14 @@ test_.describe("M1.1-8: navigation", () => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "ניווט ראשי" });
 
-    // PRJ-1 (M1.2) adds פרויקטים; owner decision (M1.3) adds חובות.
-    await expect(nav.getByRole("link")).toHaveText(["בית", "לקוחות", "פרויקטים", "חובות"]);
+    // PRJ-1 (M1.2) adds פרויקטים; owner decisions add חובות (M1.3) and הכנסות (M2.1).
+    await expect(nav.getByRole("link")).toHaveText([
+      "בית",
+      "לקוחות",
+      "פרויקטים",
+      "חובות",
+      "הכנסות",
+    ]);
     await expect(nav.getByRole("link", { name: "בית" })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: "לקוחות" })).not.toHaveAttribute(
       "aria-current",
@@ -424,7 +430,7 @@ test_.describe("M1.1-8: navigation", () => {
     const weights = await nav
       .getByRole("link")
       .evaluateAll((links) => links.map((link) => getComputedStyle(link).fontWeight));
-    expect(weights).toEqual(["400", "700", "400", "400"]);
+    expect(weights).toEqual(["400", "700", "400", "400", "400"]);
   });
 
   test_(

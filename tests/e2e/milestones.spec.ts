@@ -430,6 +430,63 @@ test_.describe("MS-2: cancel, un-cancel and delete (owner decisions)", () => {
   );
 });
 
+test_.describe("M1.3 carry-overs (M2.1 criterion 11)", () => {
+  test_(
+    "MS-2: deleting the last milestone is announced and focus moves to the section heading",
+    async ({ page, token, seedClient, seedProject, seedMilestone }) => {
+      const { projectId } = await seedProjectFor({ token, seedClient, seedProject });
+      const id = await seedMilestone({
+        project_id: projectId,
+        description: `אחרונה ${token}`,
+        amount: 1,
+        due_date: "2099-01-01",
+      });
+      await page.goto(`/projects/${projectId}`);
+
+      await page.getByRole("button", { name: `מחיקה: אחרונה ${token}` }).click();
+      const dialog = page.getByRole("dialog", { name: "למחוק את אבן הדרך לצמיתות?" });
+      await dialog.getByRole("button", { name: "מחיקה לצמיתות" }).click();
+
+      await expect(liveStatus(page)).toHaveText("אבן הדרך נמחקה.");
+      await expect(milestonesRegion(page)).toContainText("אין עדיין אבני דרך לפרויקט.");
+      await expect(milestonesRegion(page).getByRole("heading", { name: "אבני דרך" })).toBeFocused();
+      expect(await readMilestone(id)).toBeNull();
+    },
+  );
+
+  test_(
+    "MS-1: a redirect notice is shown once; it does not come back after an in-page action refreshes the page",
+    async ({ page, token, seedClient, seedProject, seedMilestone }) => {
+      const { projectId } = await seedProjectFor({ token, seedClient, seedProject });
+      await seedMilestone({
+        project_id: projectId,
+        description: `ראשונה ${token}`,
+        amount: 1,
+        due_date: "2099-01-01",
+      });
+      await page.goto(`/projects/${projectId}/milestones/new`);
+      await descriptionField(page).fill(`שנייה ${token}`);
+      await amountField(page).fill("1");
+      await dueDateField(page).fill("2099-01-01");
+      await page.getByRole("button", { name: "שמירת אבן דרך" }).click();
+
+      const notice = page.getByRole("status").filter({ hasText: "אבן הדרך נשמרה." });
+      await expect(notice).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
+
+      // The move's Server Action refreshes the page (revalidatePath).
+      await page.getByRole("button", { name: `למטה: ראשונה ${token}` }).click();
+      await expect(liveStatus(page)).toHaveText(`"ראשונה ${token}" הועברה למקום 2 מתוך 2.`);
+
+      await expect(notice).toHaveCount(0);
+      await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
+      await page.reload();
+      await expect(milestoneItems(page)).toHaveCount(2);
+      await expect(notice).toHaveCount(0);
+    },
+  );
+});
+
 test_.describe("MS-3: milestones total compared with the contract amount", () => {
   for (const [label, contract, expected] of [
     [
@@ -624,7 +681,9 @@ test_.describe("MS-6: open debts", () => {
         project_id: projectId,
         description: `חוב ${String(index + 1).padStart(2, "0")} ${token}`,
         amount: 100,
-        due_date: "1910-01-01",
+        // The earliest date the app accepts: these debts sort first in the global list, so
+        // other tests' debts cannot push them around between the pages.
+        due_date: "1900-01-01",
       }));
       const { error } = await createServiceRoleClient().from("milestones").insert(rows);
       expect(error).toBeNull();

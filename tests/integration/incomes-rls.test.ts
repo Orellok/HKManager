@@ -248,14 +248,12 @@ describe("incomes RLS: anon and users outside the allowlist", () => {
   it("INC-1: anon cannot read or write incomes or the audit log, nor call the functions", async () => {
     const { client } = await setup();
     const select = await anon.from(TABLE).select();
-    const insert = await anon
-      .from(TABLE)
-      .insert({
-        client_id: client.id,
-        received_date: "2026-01-01",
-        amount: 1,
-        payment_method: "cash",
-      });
+    const insert = await anon.from(TABLE).insert({
+      client_id: client.id,
+      received_date: "2026-01-01",
+      amount: 1,
+      payment_method: "cash",
+    });
     const audit = await anon.from(AUDIT).select();
     const rpcs = await Promise.all([
       anon.rpc("list_incomes", { p_month: "2026-01-01" }),

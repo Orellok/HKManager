@@ -7,14 +7,22 @@ import { LOGIN_PATH } from "./access";
 
 export type SessionState = "valid" | "ended" | "unknown";
 
-/** HTTP statuses with which the Auth server rejects a session that is no longer valid. */
-const SESSION_REJECTED_STATUSES: ReadonlySet<number> = new Set([401, 403]);
+const TOO_MANY_REQUESTS = 429;
+
+/**
+ * Whether the Auth server answered with a client error that rejects the session itself
+ * (401/403 for the access token, 400 refresh_token_not_found, ...). 429 is only a rate limit.
+ */
+function rejectsSession(status: number): boolean {
+  return status >= 400 && status < 500 && status !== TOO_MANY_REQUESTS;
+}
 
 /**
  * The session state from the answer of `auth.getUser()`. Only an answer that proves the
  * session is gone counts as "ended": no session at all, or the Auth server rejecting it with
- * 401/403. Anything else (no connection, rate limiting with 429, a server error) is
- * "unknown", so a temporary failure never signs the user out.
+ * a 4xx other than 429 (e.g. an invalid refresh token). Anything else (no connection, rate
+ * limiting with 429, a server error) is "unknown", so a temporary failure never signs the
+ * user out.
  */
 export function sessionStateFrom({
   user,
@@ -29,7 +37,7 @@ export function sessionStateFrom({
   if (isAuthSessionMissingError(error)) {
     return "ended";
   }
-  if (isAuthApiError(error) && SESSION_REJECTED_STATUSES.has(error.status)) {
+  if (isAuthApiError(error) && rejectsSession(error.status)) {
     return "ended";
   }
   return "unknown";

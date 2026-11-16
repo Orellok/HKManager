@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { CLIENT_OPTIONS_LIMIT, listActiveClientOptions } from "@/lib/projects/queries";
+
 import {
   createAnonClient,
   createServiceRoleClient,
@@ -536,5 +538,38 @@ describe("search_projects", () => {
     const rows = await search({ p_archived: false, p_query: bulkKey, p_limit: 1_000_000 });
 
     expect(rows).toHaveLength(100);
+  });
+});
+
+describe("project form client list", () => {
+  it("PRJ-1: lists at most 500 active clients and says when more exist", async () => {
+    const { count, error } = await service
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .is("archived_at", null);
+    expect(error).toBeNull();
+    const missing = Math.max(CLIENT_OPTIONS_LIMIT - (count ?? 0), 0);
+    if (missing > 0) {
+      const { error: seedError } = await service.from("clients").insert(
+        Array.from({ length: missing }, (_, index) => ({
+          name: `options ${randomUUID()} ${index}`,
+          notes: MARKER,
+        })),
+      );
+      expect(seedError).toBeNull();
+    }
+
+    const atLimit = await listActiveClientOptions(owner.client);
+    await insertClient();
+    const overLimit = await listActiveClientOptions(owner.client);
+
+    expect(atLimit.options).toHaveLength(CLIENT_OPTIONS_LIMIT);
+    if (missing > 0) {
+      // Exactly CLIENT_OPTIONS_LIMIT active clients: nothing is left out.
+      expect(atLimit.hasMore).toBe(false);
+    }
+    expect(overLimit.options).toHaveLength(CLIENT_OPTIONS_LIMIT);
+    expect(overLimit.hasMore).toBe(true);
+    expect(overLimit.options.every((option) => !option.archived)).toBe(true);
   });
 });

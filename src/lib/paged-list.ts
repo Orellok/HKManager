@@ -35,6 +35,7 @@ export function appendPage<Item extends { id: string }, Filter extends ListFilte
   if (!isSameFilter(previous.filter, request.filter) || previous.items.length !== request.offset) {
     return previous;
   }
+  // The next request's offset is items.length, so a dropped repeat can at worst re-fetch a row.
   const shown = new Set(previous.items.map((item) => item.id));
   return {
     ...previous,

@@ -20,19 +20,22 @@ describe("sessionStateFrom", () => {
     expect(sessionStateFrom({ user: null, error: new AuthSessionMissingError() })).toBe("ended");
   });
 
-  it.each([401, 403])(
-    "AUTH-3: the Auth server rejecting the session with %i has ended",
-    (status) => {
-      expect(
-        sessionStateFrom({ user: null, error: new AuthApiError("rejected", status, "bad_jwt") }),
-      ).toBe("ended");
-    },
-  );
+  it.each([
+    [401, "bad_jwt"],
+    [403, "bad_jwt"],
+    [400, "validation_failed"],
+    [400, "refresh_token_not_found"],
+    [404, "user_not_found"],
+  ])("AUTH-3: the Auth server rejecting the session with %i %s has ended", (status, code) => {
+    expect(
+      sessionStateFrom({ user: null, error: new AuthApiError("rejected", status, code) }),
+    ).toBe("ended");
+  });
 
   it.each([
     ["rate limiting (429)", new AuthApiError("too many", 429, "over_request_rate_limit")],
     ["a server error (500)", new AuthApiError("server", 500, "unexpected_failure")],
-    ["a bad request (400)", new AuthApiError("bad", 400, "validation_failed")],
+    ["a bad gateway (502)", new AuthApiError("gateway", 502, undefined)],
     ["no connection", new AuthRetryableFetchError("Failed to fetch", 0)],
     ["an unknown failure", new AuthUnknownError("unknown", new Error("x"))],
     ["a non-auth error", new Error("x")],

@@ -207,6 +207,10 @@ test_.describe("PRJ-1: create and edit", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("עריכת פרויקט");
     await expect(amountField(page)).toHaveValue("12500");
     await expect(page.getByLabel("תאריך התחלה")).toHaveValue("2026-11-16");
+    for (const label of ["תאריך התחלה", "תאריך סיום"]) {
+      await expect(page.getByLabel(label)).toHaveAttribute("min", "1900-01-01");
+      await expect(page.getByLabel(label)).toHaveAttribute("max", "2100-12-31");
+    }
     await page.getByRole("combobox", { name: /^סטטוס/ }).selectOption({ label: "מושהה" });
     await amountField(page).fill("99,999,999.99");
     await page.getByRole("button", { name: "שמירת שינויים" }).click();
@@ -338,6 +342,43 @@ test_.describe("PRJ-1 / PRJ-2: list, search and status filter", () => {
         new RegExp(`ישן ${token}`),
         new RegExp(`חדש ${token}`),
       ]);
+    },
+  );
+});
+
+test_.describe("PRJ-2: quick status changes", () => {
+  test_(
+    "PRJ-2: changing the status twice during a slow search shows the last choice and its results",
+    async ({ page, token, seedClient, seedProject }) => {
+      const clientId = await seedClient({ name: `מהיר ${token}` });
+      await seedProject({ client_id: clientId, name: `הושלם ${token}`, status: "completed" });
+      await seedProject({ client_id: clientId, name: `בוטל ${token}`, status: "cancelled" });
+      await page.goto("/projects");
+      await searchProjects(page, token);
+      const searches: string[] = [];
+      await page.route("**/*", async (route) => {
+        const request = route.request();
+        if (request.method() === "POST" && request.headers()["next-action"]) {
+          searches.push(request.postData() ?? "");
+          await new Promise((resolve) => setTimeout(resolve, 800));
+        }
+        await route.continue();
+      });
+      const filter = page.getByRole("combobox", { name: "סטטוס" });
+
+      await filter.selectOption("completed");
+      await filter.selectOption("cancelled");
+
+      // The select shows the latest choice at once, while the first search still runs.
+      await expect(filter).toHaveValue("cancelled");
+      await expect(page.getByRole("status").filter({ hasText: "נמצא פרויקט אחד." })).toBeVisible();
+      await expect(projectList(page).getByRole("link")).toHaveText([
+        new RegExp(`בוטל ${token}.*בוטל`),
+      ]);
+      await expect(filter).toHaveValue("cancelled");
+      // Two searches, one after the other; the stale "completed" result is never shown.
+      expect(searches).toHaveLength(2);
+      expect(searches[1]).toContain("cancelled");
     },
   );
 });

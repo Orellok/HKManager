@@ -6,7 +6,8 @@ import { Button, buttonClasses } from "@/components/button";
 import { SelectField, TextInputField, TextareaField } from "@/components/form-field";
 import { useServerForm } from "@/components/use-server-form";
 import type { ProjectFormState } from "@/lib/projects/actions";
-import type { ClientOption } from "@/lib/projects/queries";
+import { MAX_ISO_DATE, MIN_ISO_DATE } from "@/lib/dates";
+import { CLIENT_OPTIONS_LIMIT, type ClientOption } from "@/lib/projects/queries";
 import {
   PROJECT_FIELDS,
   readProjectFormValues,
@@ -20,11 +21,14 @@ type ProjectFormProps = {
   initialValues: ProjectFormValues;
   /** The clients to choose from: active ones, plus the current client when it is archived. */
   clientOptions: readonly ClientOption[];
+  /** More active clients exist than `clientOptions` holds (CLIENT_OPTIONS_LIMIT). */
+  moreClientsExist: boolean;
   submitLabel: string;
   cancelHref: string;
 };
 
 const REQUIRED = "(חובה)";
+const MORE_CLIENTS_HINT = `מוצגים ${CLIENT_OPTIONS_LIMIT} הלקוחות הפעילים הראשונים לפי שם. ללקוח אחר אפשר לפתוח פרויקט מכרטיס הלקוח.`;
 
 const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({
   value: status,
@@ -40,6 +44,7 @@ export function ProjectForm({
   action,
   initialValues,
   clientOptions,
+  moreClientsExist,
   submitLabel,
   cancelHref,
 }: ProjectFormProps) {
@@ -75,6 +80,7 @@ export function ProjectForm({
         label="לקוח"
         requiredMark={REQUIRED}
         placeholder="בחירת לקוח"
+        hint={moreClientsExist ? MORE_CLIENTS_HINT : undefined}
         options={options}
         defaultValue={values.client_id}
         error={errors.client_id}
@@ -118,6 +124,8 @@ export function ProjectForm({
           name="start_date"
           label="תאריך התחלה"
           type="date"
+          min={MIN_ISO_DATE}
+          max={MAX_ISO_DATE}
           defaultValue={values.start_date}
           error={errors.start_date}
         />
@@ -125,6 +133,8 @@ export function ProjectForm({
           name="end_date"
           label="תאריך סיום"
           type="date"
+          min={MIN_ISO_DATE}
+          max={MAX_ISO_DATE}
           defaultValue={values.end_date}
           error={errors.end_date}
         />

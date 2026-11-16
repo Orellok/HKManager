@@ -68,8 +68,12 @@ export function ProjectsBrowser({ view, initialStatus, initialPage }: ProjectsBr
     hasMore: initialPage.hasMore,
     searched: false,
   });
-  // The status shown in the filter: the one being searched while a search runs.
+  // The status shown in the filter: always the user's latest choice.
   const [status, setStatus] = useState<ProjectStatusFilter>(initialStatus);
+  /** A search asked for while another one runs; only the latest is kept and run next. */
+  const queuedSearch = useRef<Filter | null>(null);
+  /** The filter of the list on screen, for undoing the shown status when a search fails. */
+  const shownFilter = useRef<Filter>(state.filter);
   const [error, setError] = useState<string | null>(null);
   const [searchPending, startSearch] = useGuardedTransition();
   const [morePending, startLoadMore] = useGuardedTransition();
@@ -90,26 +94,41 @@ export function ProjectsBrowser({ view, initialStatus, initialPage }: ProjectsBr
     listRef.current?.querySelectorAll<HTMLAnchorElement>("a")[index]?.focus();
   }, [state.items]);
 
-  function search(filter: Filter): boolean {
-    if (busy) {
-      return false;
-    }
-    return startSearch(async () => {
-      setError(null);
-      const call = await callServerAction(() =>
-        searchProjectsAction({ view, ...filter, offset: 0 }),
-      );
-      if (call.status === "redirected") {
-        return;
+  /**
+   * Runs a search. While one is running, the new one waits and replaces any other waiting
+   * search, so quick changes (arrow keys on the status filter fire change on every step)
+   * end with the results of the last choice and no request is sent twice at once.
+   */
+  function search(filter: Filter) {
+    queuedSearch.current = filter;
+    startSearch(async () => {
+      let next = queuedSearch.current;
+      while (next) {
+        queuedSearch.current = null;
+        const current = next;
+        setError(null);
+        const call = await callServerAction(() =>
+          searchProjectsAction({ view, ...current, offset: 0 }),
+        );
+        if (call.status === "redirected") {
+          return;
+        }
+        next = queuedSearch.current;
+        if (next) {
+          // A newer search is waiting; this result is already out of date.
+          continue;
+        }
+        // A failed request (no connection, server error) keeps the list as it was, and the
+        // filter shows the status of that list again.
+        if (call.status === "failed" || !call.value.ok) {
+          setStatus(shownFilter.current.status);
+          setError(SEARCH_FAILED);
+          return;
+        }
+        const { page } = call.value;
+        shownFilter.current = current;
+        setState({ filter: current, items: page.items, hasMore: page.hasMore, searched: true });
       }
-      // A failed request (no connection, server error) keeps the list as it was.
-      if (call.status === "failed" || !call.value.ok) {
-        setStatus(state.filter.status);
-        setError(SEARCH_FAILED);
-        return;
-      }
-      const { page } = call.value;
-      setState({ filter, items: page.items, hasMore: page.hasMore, searched: true });
     });
   }
 
@@ -124,15 +143,13 @@ export function ProjectsBrowser({ view, initialStatus, initialPage }: ProjectsBr
 
   function changeStatus(event: ChangeEvent<HTMLSelectElement>) {
     const next = event.currentTarget.value;
-    if (isStatusFilter(next) && search({ query: currentQuery(), status: next })) {
+    if (isStatusFilter(next)) {
       setStatus(next);
+      search({ query: currentQuery(), status: next });
     }
   }
 
   function clearSearch() {
-    if (busy) {
-      return;
-    }
     if (inputRef.current) {
       inputRef.current.value = "";
       inputRef.current.focus();

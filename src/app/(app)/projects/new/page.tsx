@@ -17,7 +17,7 @@ import { ProjectForm } from "../project-form";
  */
 export default async function NewProjectPage({ searchParams }: PageProps<"/projects/new">) {
   await requireAllowedUser();
-  const { options, selected } = await loadFormClients((await searchParams)[CLIENT_PARAM]);
+  const { options, hasMore, selected } = await loadFormClients((await searchParams)[CLIENT_PARAM]);
 
   if (selected?.archived) {
     return (
@@ -65,6 +65,7 @@ export default async function NewProjectPage({ searchParams }: PageProps<"/proje
         action={createProjectAction}
         initialValues={{ ...EMPTY_PROJECT_FORM_VALUES, client_id: selected?.id ?? "" }}
         clientOptions={options}
+        moreClientsExist={hasMore}
         submitLabel="שמירת פרויקט"
         cancelHref={selected ? clientPath(selected.id) : PROJECTS_PATH}
       />

@@ -12,7 +12,7 @@ import { loadProjectOrNotFound } from "../load-project";
 export default async function EditProjectPage({ params }: PageProps<"/projects/[id]/edit">) {
   await requireAllowedUser();
   const project = await loadProjectOrNotFound(params);
-  const { options } = await loadFormClients(project.client_id);
+  const { options, hasMore } = await loadFormClients(project.client_id);
   const initialValues: ProjectFormValues = {
     client_id: project.client_id,
     name: project.name,
@@ -32,6 +32,7 @@ export default async function EditProjectPage({ params }: PageProps<"/projects/[
         action={updateProjectAction.bind(null, project.id)}
         initialValues={initialValues}
         clientOptions={options}
+        moreClientsExist={hasMore}
         submitLabel="שמירת שינויים"
         cancelHref={projectPath(project.id)}
       />

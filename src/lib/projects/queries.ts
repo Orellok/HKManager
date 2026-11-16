@@ -140,23 +140,32 @@ export async function listClientProjects(
   };
 }
 
+export type ClientOptions = {
+  options: ClientOption[];
+  /** More active clients exist than CLIENT_OPTIONS_LIMIT. */
+  hasMore: boolean;
+};
+
 /** Active clients for the project form, by name (at most CLIENT_OPTIONS_LIMIT). */
-export async function listActiveClientOptions(supabase: SupabaseClient): Promise<ClientOption[]> {
+export async function listActiveClientOptions(supabase: SupabaseClient): Promise<ClientOptions> {
   const { data, error } = await supabase
     .from("clients")
     .select("id, name")
     .is("archived_at", null)
     .order("name")
     .order("id")
-    .limit(CLIENT_OPTIONS_LIMIT);
+    // One extra row tells whether more exist.
+    .limit(CLIENT_OPTIONS_LIMIT + 1);
   if (error) {
     throw new Error("Could not list clients for the project form", { cause: error });
   }
-  return (data as { id: string; name: string }[]).map(({ id, name }) => ({
-    id,
-    name,
-    archived: false,
-  }));
+  const rows = data as { id: string; name: string }[];
+  return {
+    options: rows
+      .slice(0, CLIENT_OPTIONS_LIMIT)
+      .map(({ id, name }) => ({ id, name, archived: false })),
+    hasMore: rows.length > CLIENT_OPTIONS_LIMIT,
+  };
 }
 
 /** One client for the project form (archived or not), or null when it does not exist. */

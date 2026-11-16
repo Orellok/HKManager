@@ -406,8 +406,8 @@ test_.describe("M1.1-8: navigation", () => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "ניווט ראשי" });
 
-    // PRJ-1 (M1.2) adds פרויקטים.
-    await expect(nav.getByRole("link")).toHaveText(["בית", "לקוחות", "פרויקטים"]);
+    // PRJ-1 (M1.2) adds פרויקטים; owner decision (M1.3) adds חובות.
+    await expect(nav.getByRole("link")).toHaveText(["בית", "לקוחות", "פרויקטים", "חובות"]);
     await expect(nav.getByRole("link", { name: "בית" })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: "לקוחות" })).not.toHaveAttribute(
       "aria-current",

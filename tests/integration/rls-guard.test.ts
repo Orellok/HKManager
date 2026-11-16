@@ -19,7 +19,7 @@ describe("RLS guard", () => {
 
     // Guards against a vacuous pass if the query stopped seeing the schema.
     expect(tables.map((table) => table.table_name)).toEqual(
-      expect.arrayContaining(["allowed_users", "clients"]),
+      expect.arrayContaining(["allowed_users", "clients", "projects"]),
     );
 
     const tablesWithoutRls = tables

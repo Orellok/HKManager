@@ -44,7 +44,6 @@ const EDGE_MESSAGES: Record<MoveDirection, string> = {
   up: "אבן הדרך כבר ראשונה ברשימה.",
   down: "אבן הדרך כבר אחרונה ברשימה.",
 };
-const MOVE_OUTDATED = "הסדר השתנה בינתיים. הרשימה עודכנה.";
 const NOT_FOUND = "אבן הדרך לא נמצאה. ייתכן שנמחקה.";
 
 function buttonId(milestoneId: string, action: "up" | "down" | "cancel" | "restore") {
@@ -56,9 +55,10 @@ function buttonId(milestoneId: string, action: "up" | "down" | "cancel" | "resto
  * "למעלה"/"למטה", edit, cancel / un-cancel and delete. One action runs at a time; results
  * and failures are announced in the live region, and nothing is ever `disabled`, so focus is
  * never dropped:
- * - after a move, focus stays on the moved milestone's button. At the top or bottom edge the
- *   button stays focusable but is marked aria-disabled, sends nothing and announces that the
- *   milestone is already first or last;
+ * - after a move, focus stays on the moved milestone's button, and the new place and the list
+ *   length announced are the ones the database reports. On the current data the first item's
+ *   "למעלה" and the last item's "למטה" are marked aria-disabled as a hint, but stay focusable
+ *   and still ask the database, which answers "already first/last" when nothing can move;
  * - after cancel / un-cancel, focus moves to the counterpart button of the same milestone;
  * - after delete, focus moves to the section heading.
  */
@@ -95,13 +95,12 @@ export function MilestoneList({ projectId, items, headingId }: MilestoneListProp
     });
   }
 
-  function move(index: number, direction: MoveDirection) {
-    const item = items[index];
-    const target = moveTargetIndex(index, items.length, direction);
-    if (target === null) {
-      setStatus({ message: EDGE_MESSAGES[direction], error: null });
-      return;
-    }
+  /**
+   * The database decides whether the milestone can move and where it ends up; the list on
+   * screen may be out of date (another session may have changed the order), so it is not
+   * consulted here. The aria-disabled edge buttons are a hint only and still ask.
+   */
+  function move(item: MilestoneListItem, direction: MoveDirection) {
     run(`${item.id}:${direction}`, async () => {
       const call = await callServerAction(() => moveMilestoneAction(item.id, direction));
       if (call.status === "failed") {
@@ -114,14 +113,16 @@ export function MilestoneList({ projectId, items, headingId }: MilestoneListProp
       const result = call.value;
       if (result.status === "failed") {
         setStatus({ message: null, error: result.error });
-      } else if (result.status === "moved") {
+      } else if (result.status === "not_found") {
+        setStatus({ message: null, error: NOT_FOUND });
+      } else if (result.status === "edge") {
+        setStatus({ message: EDGE_MESSAGES[direction], error: null });
+      } else {
         focusTarget.current = buttonId(item.id, direction);
         setStatus({
-          message: `"${item.description}" הועברה למקום ${target + 1} מתוך ${items.length}.`,
+          message: `"${item.description}" הועברה למקום ${result.place} מתוך ${result.total}.`,
           error: null,
         });
-      } else {
-        setStatus({ message: null, error: result.status === "edge" ? MOVE_OUTDATED : NOT_FOUND });
       }
     });
   }
@@ -190,7 +191,7 @@ export function MilestoneList({ projectId, items, headingId }: MilestoneListProp
                       key={direction}
                       id={buttonId(item.id, direction)}
                       variant="secondary"
-                      onClick={() => move(index, direction)}
+                      onClick={() => move(item, direction)}
                       pending={isBusy}
                       aria-disabled={atEdge || isBusy || undefined}
                       aria-label={`${MOVE_LABELS[direction]}: ${item.description}`}

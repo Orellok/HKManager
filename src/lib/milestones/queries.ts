@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { countFromDb } from "@/lib/db-numbers";
 import { agorotFromDb } from "@/lib/money";
 
 import type { MoveDirection } from "./reorder";
@@ -150,25 +151,44 @@ export async function deleteMilestone(
   return data.length > 0 ? "deleted" : "not_found";
 }
 
-export type MoveMilestoneResult = "moved" | "edge" | "not_found";
+export type MoveMilestoneResult =
+  | {
+      /** "edge": already first (up) or last (down); nothing changed. */
+      status: "moved" | "edge";
+      /** The milestone's place in its project's list after the call, 1-based. */
+      place: number;
+      /** The number of milestones in the project. */
+      total: number;
+    }
+  | { status: "not_found" };
 
-const MOVE_RESULTS: readonly MoveMilestoneResult[] = ["moved", "edge", "not_found"];
+type MoveRow = { result: unknown; place: unknown; total: unknown };
 
-/** MS-1: swaps a milestone with its neighbour, atomically and under a per-project lock. */
+/**
+ * MS-1: swaps a milestone with its neighbour, atomically and under a per-project lock. The
+ * place and total come from the database, read under that lock.
+ */
 export async function moveMilestone(
   supabase: SupabaseClient,
   id: string,
   direction: MoveDirection,
 ): Promise<MoveMilestoneResult> {
-  const { data, error } = await supabase.rpc("move_milestone", {
-    p_milestone_id: id,
-    p_direction: direction,
-  });
+  const { data, error } = await supabase
+    .rpc("move_milestone", { p_milestone_id: id, p_direction: direction })
+    .single<MoveRow>();
   if (error) {
     throw new Error("Could not move the milestone", { cause: error });
   }
-  if (!MOVE_RESULTS.includes(data as MoveMilestoneResult)) {
+  if (data.result === "not_found") {
+    return { status: "not_found" };
+  }
+  if (data.result !== "moved" && data.result !== "edge") {
     throw new Error("move_milestone returned an unexpected result");
   }
-  return data as MoveMilestoneResult;
+  const place = countFromDb(data.place);
+  const total = countFromDb(data.total);
+  if (place < 1 || place > total) {
+    throw new Error("move_milestone returned a place outside the list");
+  }
+  return { status: data.result, place, total };
 }

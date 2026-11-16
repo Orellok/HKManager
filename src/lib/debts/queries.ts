@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { daysBetween } from "@/lib/dates";
+import { countFromDb } from "@/lib/db-numbers";
 import { agorotFromDb, agorotTotalFromDb } from "@/lib/money";
 import type { ListPage } from "@/lib/paged-list";
 
@@ -73,7 +74,7 @@ export async function getOpenDebtsSummary(
     throw new Error("Could not summarize open debts", { cause: error });
   }
   return {
-    count: agorotTotalFromDb(data.debt_count),
+    count: countFromDb(data.debt_count),
     total: agorotTotalFromDb(data.total_balance),
   };
 }

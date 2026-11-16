@@ -38,8 +38,7 @@ import {
 
 export type MilestoneFormState = ServerFormState<MilestoneField>;
 
-export type MoveMilestoneActionResult =
-  { status: MoveMilestoneResult; error: null } | { status: "failed"; error: string };
+export type MoveMilestoneActionResult = MoveMilestoneResult | { status: "failed"; error: string };
 
 const MESSAGES = {
   saveFailed: "השמירה נכשלה. הפרטים לא נשמרו, אפשר לנסות שוב.",
@@ -141,7 +140,7 @@ export async function moveMilestoneAction(
   await requireAllowedUser();
   const parsed = moveInputSchema.safeParse({ id: milestoneId, direction });
   if (!parsed.success) {
-    return { status: "not_found", error: null };
+    return { status: "not_found" };
   }
   let result: MoveMilestoneResult;
   try {
@@ -156,7 +155,7 @@ export async function moveMilestoneAction(
   }
   // Also after "edge" or "not_found": the card was out of date, so it is reloaded.
   revalidateMilestoneScreens();
-  return { status: result, error: null };
+  return result;
 }
 
 async function setCancelled(milestoneId: string, cancelled: boolean): Promise<ActionStatus> {

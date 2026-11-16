@@ -260,7 +260,7 @@ describe("milestones RLS: authenticated user not in the allowlist", () => {
     const remove = await outsider.client.from(TABLE).delete().eq("id", target.id).select();
 
     expect(update.data).toEqual([]);
-    expect(move.data).toBe("not_found");
+    expect(move.data).toEqual([{ result: "not_found", place: null, total: null }]);
     expect(remove.data).toEqual([]);
     expect(await readMilestone(target.id)).toEqual(target);
   });
@@ -503,10 +503,22 @@ describe("MS-1: order", () => {
     const c = await insertMilestone(own.id);
     await service.from(TABLE).delete().eq("id", gap.id);
 
-    expect(await moveMilestone(owner.client, b.id, "up")).toBe("moved");
+    expect(await moveMilestone(owner.client, b.id, "up")).toEqual({
+      status: "moved",
+      place: 1,
+      total: 3,
+    });
     expect((await order(own.id)).ids).toEqual([b.id, a.id, c.id]);
-    expect(await moveMilestone(owner.client, b.id, "down")).toBe("moved");
-    expect(await moveMilestone(owner.client, b.id, "down")).toBe("moved");
+    expect(await moveMilestone(owner.client, b.id, "down")).toEqual({
+      status: "moved",
+      place: 2,
+      total: 3,
+    });
+    expect(await moveMilestone(owner.client, b.id, "down")).toEqual({
+      status: "moved",
+      place: 3,
+      total: 3,
+    });
     expect((await order(own.id)).ids).toEqual([a.id, c.id, b.id]);
   });
 
@@ -516,13 +528,21 @@ describe("MS-1: order", () => {
     const b = await insertMilestone(own.id);
     const before = await order(own.id);
 
-    expect(await moveMilestone(owner.client, a.id, "up")).toBe("edge");
-    expect(await moveMilestone(owner.client, b.id, "down")).toBe("edge");
+    expect(await moveMilestone(owner.client, a.id, "up")).toEqual({
+      status: "edge",
+      place: 1,
+      total: 2,
+    });
+    expect(await moveMilestone(owner.client, b.id, "down")).toEqual({
+      status: "edge",
+      place: 2,
+      total: 2,
+    });
     expect(await order(own.id)).toEqual(before);
   });
 
   it("MS-1: moving an unknown milestone reports not_found", async () => {
-    expect(await moveMilestone(owner.client, randomUUID(), "up")).toBe("not_found");
+    expect(await moveMilestone(owner.client, randomUUID(), "up")).toEqual({ status: "not_found" });
   });
 
   it("MS-1: an unknown direction is refused", async () => {
@@ -567,7 +587,9 @@ describe("MS-1: order", () => {
       ),
     );
 
-    expect(results.every((result) => result === "moved" || result === "edge")).toBe(true);
+    expect(results.every((result) => result.status === "moved" || result.status === "edge")).toBe(
+      true,
+    );
     const after = await order(own.id);
     expect([...after.ids].sort()).toEqual([...ids].sort());
     expect(new Set(after.places).size).toBe(ids.length);
@@ -601,6 +623,48 @@ describe("MS-1: order", () => {
       .eq("id", b.id);
 
     expect(error?.code).toBe("23505");
+  });
+});
+
+describe("MS-1: sort_order bounds", () => {
+  it("MS-1: the database refuses a place above 1,000,000 or below 1", async () => {
+    const own = await insertProject();
+    const milestone = await insertMilestone(own.id);
+
+    const tooHigh = await owner.client
+      .from(TABLE)
+      .update({ sort_order: 2_147_483_647 })
+      .eq("id", milestone.id);
+    const zero = await owner.client.from(TABLE).update({ sort_order: 0 }).eq("id", milestone.id);
+
+    expect(tooHigh.error?.code).toBe(CHECK_VIOLATION);
+    expect(zero.error?.code).toBe(CHECK_VIOLATION);
+    expect((await readMilestone(milestone.id))?.sort_order).toBe(1);
+  });
+
+  it("MS-1: after a place at the bound, a new milestone still goes last (the list is renumbered)", async () => {
+    const own = await insertProject();
+    const a = await insertMilestone(own.id);
+    const b = await insertMilestone(own.id);
+    const c = await insertMilestone(own.id);
+    // a goes to the very end with a direct write at the bound.
+    const { error } = await owner.client
+      .from(TABLE)
+      .update({ sort_order: 1_000_000 })
+      .eq("id", a.id);
+    expect(error).toBeNull();
+
+    const { data, error: insertError } = await owner.client
+      .from(TABLE)
+      .insert({ project_id: own.id, description: "אחרונה", amount: 1, due_date: "2026-12-01" })
+      .select("id")
+      .single<{ id: string }>();
+
+    expect(insertError).toBeNull();
+    expect(await order(own.id)).toEqual({
+      ids: [b.id, c.id, a.id, data?.id],
+      places: [1, 2, 3, 4],
+    });
   });
 });
 
@@ -647,12 +711,22 @@ describe("milestone_balances", () => {
 });
 
 describe("MS-6: open debts", () => {
-  // Due dates in 1901–1902 keep this file's debts apart from any other data in the database.
+  // Due dates in 1901–1902 keep this file's debts apart from other data in the database. The
+  // assertions still only look at this block's own client, and totals are compared with a
+  // baseline taken before seeding, so leftovers of an interrupted run cannot break them.
   const TODAY = "1902-01-10";
   let debtClient: { id: string; name: string };
   let ids: Record<string, string>;
+  let baseline: { count: number; total: number };
+
+  /** This block's debts, in list order. */
+  async function ownDebts(today: string) {
+    const page = await listOpenDebts(owner.client, today, 0);
+    return page.items.filter((debt) => debt.client_id === debtClient.id);
+  }
 
   beforeAll(async () => {
+    baseline = await getOpenDebtsSummary(owner.client, TODAY);
     debtClient = await insertClient({ name: uniqueName("חייב") });
     const active = await insertProject({ client_id: debtClient.id, status: "active" });
     const completed = await insertProject({ client_id: debtClient.id, status: "completed" });
@@ -688,11 +762,10 @@ describe("MS-6: open debts", () => {
   });
 
   it("MS-6: lists overdue milestones with a balance, oldest first, whatever the project's status or archive state", async () => {
-    const page = await listOpenDebts(owner.client, TODAY, 0);
+    const debts = await ownDebts(TODAY);
 
-    expect(page.items.map((debt) => debt.id)).toEqual([ids.oldest, ids.middle, ids.yesterday]);
-    expect(page.hasMore).toBe(false);
-    expect(page.items[0]).toMatchObject({
+    expect(debts.map((debt) => debt.id)).toEqual([ids.oldest, ids.middle, ids.yesterday]);
+    expect(debts[0]).toMatchObject({
       due_date: "1901-01-01",
       balance: 100_000,
       days_overdue: 374,
@@ -700,7 +773,7 @@ describe("MS-6: open debts", () => {
       client_name: debtClient.name,
       project_archived: false,
     });
-    expect(page.items[2]).toMatchObject({
+    expect(debts[2]).toMatchObject({
       days_overdue: 1,
       balance: 300_050,
       project_id: ids.archivedProject,
@@ -708,9 +781,15 @@ describe("MS-6: open debts", () => {
     });
   });
 
-  it("MS-6: due today, in the future, cancelled or with nothing to pay is not an open debt", async () => {
+  it("MS-6: the whole list is sorted by due date, oldest first", async () => {
     const page = await listOpenDebts(owner.client, TODAY, 0);
-    const listed = page.items.map((debt) => debt.id);
+    const dates = page.items.map((debt) => debt.due_date);
+
+    expect(dates).toEqual([...dates].sort());
+  });
+
+  it("MS-6: due today, in the future, cancelled or with nothing to pay is not an open debt", async () => {
+    const listed = (await ownDebts(TODAY)).map((debt) => debt.id);
 
     for (const id of [ids.today, ids.future, ids.cancelled, ids.zero]) {
       expect(listed).not.toContain(id);
@@ -718,9 +797,7 @@ describe("MS-6: open debts", () => {
   });
 
   it("MS-6: the next day, the milestone due today becomes an open debt", async () => {
-    const page = await listOpenDebts(owner.client, "1902-01-11", 0);
-
-    expect(page.items.map((debt) => debt.id)).toEqual([
+    expect((await ownDebts("1902-01-11")).map((debt) => debt.id)).toEqual([
       ids.oldest,
       ids.middle,
       ids.yesterday,
@@ -730,8 +807,8 @@ describe("MS-6: open debts", () => {
 
   it("MS-6: the summary counts and sums the same debts", async () => {
     expect(await getOpenDebtsSummary(owner.client, TODAY)).toEqual({
-      count: 3,
-      total: 600_050,
+      count: baseline.count + 3,
+      total: baseline.total + 600_050,
     });
   });
 
@@ -742,24 +819,33 @@ describe("MS-6: open debts", () => {
       p_limit: 1,
       p_offset: 1,
     });
+    const allIds = (all.data as { id: string }[]).map((row) => row.id);
 
-    expect((all.data as unknown[]).length).toBeLessThanOrEqual(100);
-    expect((second.data as { id: string }[]).map((row) => row.id)).toEqual([ids.middle]);
+    expect(allIds.length).toBeLessThanOrEqual(100);
+    expect((second.data as { id: string }[]).map((row) => row.id)).toEqual([allIds[1]]);
   });
 
   it("MS-6: a large page is capped at 100 rows", async () => {
     const big = await insertProject({ client_id: debtClient.id });
-    const rows = Array.from({ length: 100 }, (_, index) => ({
-      project_id: big.id,
-      description: `ישן ${index}`,
-      amount: 1,
-      due_date: "1900-06-01",
-    }));
-    await service.from(TABLE).insert(rows);
+    try {
+      const rows = Array.from({ length: 100 }, (_, index) => ({
+        project_id: big.id,
+        description: `ישן ${index}`,
+        amount: 1,
+        due_date: "1900-06-01",
+      }));
+      const { error } = await service.from(TABLE).insert(rows);
+      expect(error).toBeNull();
 
-    const { data } = await owner.client.rpc("list_open_debts", { p_today: TODAY, p_limit: 1000 });
+      const { data } = await owner.client.rpc("list_open_debts", {
+        p_today: TODAY,
+        p_limit: 1000,
+      });
 
-    expect((data as unknown[]).length).toBe(100);
-    await service.from(TABLE).delete().eq("project_id", big.id);
+      expect((data as unknown[]).length).toBe(100);
+    } finally {
+      // Removed right away (afterAll also would) so the other tests see no extra debts.
+      await service.from(TABLE).delete().eq("project_id", big.id);
+    }
   });
 });

@@ -14,7 +14,10 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { paths: [{ name: "zod", message: 'Import { z } from "@/lib/zod" instead.' }] },
+        {
+          paths: [{ name: "zod", message: 'Import { z } from "@/lib/zod" instead.' }],
+          patterns: [{ group: ["zod/*"], message: 'Import { z } from "@/lib/zod" instead.' }],
+        },
       ],
     },
   },

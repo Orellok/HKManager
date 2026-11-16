@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_AGOROT,
   agorotFromDb,
+  agorotTotalFromDb,
   agorotToShekelInput,
   formatAgorot,
   parseShekelsToAgorot,
@@ -140,4 +141,22 @@ describe("agorotFromDb", () => {
   ])("PRJ-1: rejects %j", (value) => {
     expect(() => agorotFromDb(value)).toThrow(RangeError);
   });
+});
+
+describe("agorotTotalFromDb", () => {
+  it.each([
+    [0, 0],
+    [MAX_AGOROT + 1, MAX_AGOROT + 1],
+    ["123456789012", 123_456_789_012],
+    [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+  ])("MS-6: reads the total %j as %i agorot", (value, agorot) => {
+    expect(agorotTotalFromDb(value)).toBe(agorot);
+  });
+
+  it.each([null, -1, 1.5, "1.5", "abc", Number.MAX_SAFE_INTEGER + 1, "9007199254740993"])(
+    "MS-6: rejects the total %j",
+    (value) => {
+      expect(() => agorotTotalFromDb(value)).toThrow(RangeError);
+    },
+  );
 });

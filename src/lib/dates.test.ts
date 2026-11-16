@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  daysBetween,
-  formatIsoDate,
-  isIsoDate,
-  isIsoDateInRange,
-  todayInJerusalem,
-} from "./dates";
+import { daysBetween, formatIsoDate, isIsoDate, isIsoDateInRange, todayInJerusalem } from "./dates";
 
 describe("isIsoDate", () => {
   it.each(["2026-11-16", "2024-02-29", "2026-12-31", "2027-01-01", "1900-01-01", "2100-12-31"])(

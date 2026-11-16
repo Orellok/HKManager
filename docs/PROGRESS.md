@@ -12,6 +12,7 @@ Commit and push after every meaningful step.
 - Permissions-Policy: camera stays blocked until M3; open camera=(self) as part of M3 (expense photo capture).
 - 2026-11-15: owner created Supabase projects hkmanager-staging and hkmanager-prod (Free plan → 2 free projects confirmed in practice). Refs recorded in docs/setup/environments.md.
 - 2026-11-16: owner approved M1.1 Hebrew copy and choices (search on submit via POST, duplicate check on blur + post-save notice, phone rules, max lengths).
+- 2026-11-16: owner approved M1.1 round-2 copy ("לא ניתן לשמור כרגע…", "הפעולה לא בוצעה…", "לא הצלחנו לטעון את הדף").
 - Owner wants work committed continuously and resumed autonomously after interruptions.
 
 ## Status

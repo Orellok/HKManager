@@ -3,21 +3,34 @@ import Link from "next/link";
 import { buttonClasses } from "@/components/button";
 import { RedirectNotice } from "@/components/redirect-notice";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { logClientFailure } from "@/lib/clients/log";
 import { clientNoticeMessage } from "@/lib/clients/notices";
 import { ARCHIVED_CLIENTS_PATH, CLIENTS_PATH, editClientPath } from "@/lib/clients/paths";
 import { NOTICE_PARAM } from "@/lib/notices";
+import { listClientProjects, type ClientProject } from "@/lib/projects/queries";
+import type { ListPage } from "@/lib/paged-list";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { ClientProjects } from "./client-projects";
 import { ClientStatusActions } from "./client-status-actions";
 import { loadClientOrNotFound } from "./load-client";
 
 type DetailRow = { label: string; value: string | null; href?: string; ltr?: boolean };
 
-/** CLI-4: the client card. M1.1 shows the details; projects and balances come in M1.2 / M2. */
+/** CLI-4: the client card: details and projects. Total paid and balance come in M2. */
 export default async function ClientPage({ params, searchParams }: PageProps<"/clients/[id]">) {
   await requireAllowedUser();
   const client = await loadClientOrNotFound(params);
   const notice = clientNoticeMessage((await searchParams)[NOTICE_PARAM]);
   const isArchived = client.archived_at !== null;
+  let projects: ListPage<ClientProject>;
+  try {
+    projects = await listClientProjects(await createSupabaseServerClient(), client.id);
+  } catch (error) {
+    // Logged by code only; the error boundary gets no database details (SPEC 8).
+    logClientFailure("read projects", error);
+    throw new Error("Could not load the client's projects");
+  }
 
   const details: DetailRow[] = [
     {
@@ -87,6 +100,8 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/c
           isArchived={isArchived}
         />
       </div>
+
+      <ClientProjects clientId={client.id} isClientArchived={isArchived} projects={projects} />
     </article>
   );
 }

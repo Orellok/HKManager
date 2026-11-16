@@ -21,7 +21,7 @@ Commit and push after every meaningful step.
 | M0.1 Scaffold | DONE – review APPROVED, QA PASS, 0 fix rounds | docs/specs/m0-1-scaffold.md |
 | M0.3 Auth | DONE – review APPROVED, QA PASS, 2 fix rounds (prefetch auth bypass; hook fail-closed + /login redirect) | docs/specs/m0-3-auth.md |
 | M0.4 CI + migrations workflow | DONE – review APPROVED, QA PASS, 1 polish round; CI green on GitHub (runs 1-8). Staging/prod workflows verified by mocks only until first merge to main + secrets | docs/specs/m0-4-ci.md |
-| M1.1 Clients | fix round 2 re-review APPROVED – fix round 3 (final) for expired-session regression | docs/specs/m1-1-clients.md |
+| M1.1 Clients | fix round 3 done (f4e9682, d54eeac) – in re-review, then QA retest | docs/specs/m1-1-clients.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## Next step

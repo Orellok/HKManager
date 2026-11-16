@@ -17,6 +17,10 @@ export function isIsoDate(value: string): boolean {
     return false;
   }
   const [year, month, day] = match.slice(1).map(Number);
+  // There is no year 0 in the calendar users mean (1 BC is followed by AD 1).
+  if (year < 1) {
+    return false;
+  }
   // An impossible day rolls over to the next month; the round trip catches that.
   const date = utcMidnight(year, month, day);
   return (

@@ -1,4 +1,10 @@
-import { MAX_ISO_DATE, MIN_ISO_DATE, formatIsoDate, isIsoDate, isIsoDateInRange } from "@/lib/dates";
+import {
+  MAX_ISO_DATE,
+  MIN_ISO_DATE,
+  formatIsoDate,
+  isIsoDate,
+  isIsoDateInRange,
+} from "@/lib/dates";
 import { emptyToNull } from "@/lib/forms";
 import { MAX_AGOROT, formatAgorot, parseShekelsToAgorot, type ShekelParseError } from "@/lib/money";
 import { z } from "@/lib/zod";
@@ -43,11 +49,7 @@ export function optionalDateField() {
 
 /** A required date, with `requiredMessage` when empty. */
 export function requiredDateField(requiredMessage: string) {
-  return z
-    .string()
-    .trim()
-    .min(1, { error: requiredMessage, abort: true })
-    .pipe(dateString());
+  return z.string().trim().min(1, { error: requiredMessage, abort: true }).pipe(dateString());
 }
 
 function toAgorot(value: string, context: z.RefinementCtx): number {

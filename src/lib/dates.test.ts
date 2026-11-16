@@ -41,7 +41,7 @@ describe("isIsoDate: years 0001–0099", () => {
     },
   );
 
-  it.each(["0050-02-29", "0099-04-31"])("M1.3-10: %j is not a date", (value) => {
+  it.each(["0050-02-29", "0099-04-31", "0000-01-01"])("M1.3-10: %j is not a date", (value) => {
     expect(isIsoDate(value)).toBe(false);
   });
 });

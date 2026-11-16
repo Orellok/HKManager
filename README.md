@@ -76,3 +76,28 @@ The integration tests create their own users through the local admin API and del
 afterwards. They read the keys from `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 and `SUPABASE_SERVICE_ROLE_KEY` when all three are set, and otherwise from
 `supabase status`. They refuse to run against anything other than localhost.
+
+## CI and database migrations (GitHub Actions)
+
+Three workflows live in `.github/workflows/`. Every third-party action is pinned to a full
+commit SHA, and every workflow runs with read-only repository permissions.
+
+| Workflow | Runs | What it does |
+|---|---|---|
+| `ci.yml` (CI) | every push and pull request | `pnpm install --frozen-lockfile`, Prettier check, lint, typecheck, unit tests, starts the local Supabase stack, integration tests, build, then Playwright E2E (Chromium, `--trace off`). Any failing step fails the run. |
+| `staging-migrations.yml` | after CI succeeds for a push to `main` | Checks out that exact commit, links the staging project (`tmistmqyqcnjftovxyoy`) and runs `supabase db push --remote`. |
+| `production-migrations.yml` | manually (Actions → Run workflow, branch `main`) | Refuses to run unless a successful staging migrations run exists for the same commit, then links production (`gnjdyiujvxbwhxmldgfn`) and runs `supabase db push --remote`. |
+
+- Node 22 and the pnpm version from `package.json` are used everywhere. The Supabase CLI comes
+  from the devDependency (`pnpm exec supabase`), so CI and the migrations use one CLI version.
+- The migrations workflows use a concurrency group per environment: two runs never push to the
+  same database at the same time; a second run waits instead of being cancelled.
+- The production guard reads the staging runs through the Actions API (`actions: read`). Each
+  staging run is titled `Staging migrations <commit SHA>`, and the guard looks for a successful
+  run with that exact title.
+- `supabase db push` applies only the pending files in `supabase/migrations/` and records them
+  in the project's migration history. It does not push the auth settings in
+  `supabase/config.toml` (the before-user-created hook, providers, redirect URLs), which stay
+  manual (`docs/setup/supabase-auth.md`), and it does not run `supabase/seed.sql`.
+- Secrets live only in GitHub Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_STAGING_DB_PASSWORD`
+  and `SUPABASE_PROD_DB_PASSWORD`. Setup guide (Hebrew): `docs/setup/github-secrets.md`.

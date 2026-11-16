@@ -41,6 +41,32 @@ const field = {
   notes: (page: Page) => page.getByRole("textbox", { name: /^הערות/ }),
 };
 
+/**
+ * Opens an income form and waits until it is interactive: the linked client, project and
+ * milestone selects stay disabled until hydration, so a choice cannot be reset by it.
+ */
+async function gotoIncomeForm(page: Page, path: string) {
+  await page.goto(path);
+  await incomeFormReady(page);
+}
+
+/** Waits until the income form on screen is interactive (see gotoIncomeForm). */
+async function incomeFormReady(page: Page) {
+  await expect(field.client(page)).toBeEnabled();
+}
+
+/** Opens the incomes list and waits until its filters are interactive (after hydration). */
+async function gotoIncomesList(page: Page) {
+  await page.goto("/incomes");
+  await expect(page.getByLabel("חודש")).toBeEnabled();
+}
+
+/** Picks a month in the list filter; the value shown must be the one picked. */
+async function chooseMonth(page: Page, month: string) {
+  await page.getByLabel("חודש").fill(month);
+  await expect(page.getByLabel("חודש")).toHaveValue(month);
+}
+
 function milestonesRegion(page: Page) {
   return page.getByRole("region", { name: "אבני דרך" });
 }
@@ -134,6 +160,8 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
 
       await page.getByRole("link", { name: `רשום תשלום: מקדמה ${token}` }).click();
 
+      await incomeFormReady(page);
+
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("רישום תשלום");
       await expect(field.client(page)).toHaveValue(clientId);
       await expect(field.project(page)).toHaveValue(projectId);
@@ -180,6 +208,8 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
       await page.goto(`/projects/${projectId}`);
 
       await page.getByRole("link", { name: `רשום תשלום: מקדמה ${token}` }).click();
+
+      await incomeFormReady(page);
       await field.amount(page).fill("400");
       await field.method(page).selectOption({ label: "מזומן" });
       await page.getByRole("button", { name: "רישום התשלום" }).click();
@@ -189,6 +219,8 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
       await expect(item).toContainText(`יתרה: ${shekels(60_000)}`);
 
       await page.getByRole("link", { name: `רשום תשלום: מקדמה ${token}` }).click();
+
+      await incomeFormReady(page);
       // MS-4: the amount defaults to what is left.
       await expect(field.amount(page)).toHaveValue("600");
       await field.method(page).selectOption({ label: "העברה בנקאית" });
@@ -215,6 +247,7 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
       });
       await page.goto(`/projects/${projectId}`);
       await page.getByRole("link", { name: `רשום תשלום: מקדמה ${token}` }).click();
+      await incomeFormReady(page);
       await field.amount(page).fill("1,250");
       await field.method(page).selectOption({ label: "צ'ק" });
 
@@ -253,6 +286,7 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
       });
       await page.goto(`/projects/${projectId}`);
       await page.getByRole("link", { name: `רשום תשלום: מקדמה ${token}` }).click();
+      await incomeFormReady(page);
       await field.amount(page).fill("1,100");
       await field.method(page).selectOption({ label: "אשראי" });
       await page.getByRole("button", { name: "רישום התשלום" }).click();
@@ -286,7 +320,7 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
         seedProject,
         seedMilestone,
       });
-      await page.goto(`/incomes/new?milestone=${milestoneId}&from=project`);
+      await gotoIncomeForm(page, `/incomes/new?milestone=${milestoneId}&from=project`);
       await field.amount(page).fill("1,250");
       await field.method(page).selectOption({ label: "מזומן" });
       await page.getByRole("button", { name: "רישום התשלום" }).click();
@@ -337,7 +371,7 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
         seedProject,
         seedMilestone,
       });
-      await page.goto(`/incomes/new?milestone=${milestoneId}&from=project`);
+      await gotoIncomeForm(page, `/incomes/new?milestone=${milestoneId}&from=project`);
       await field.method(page).selectOption({ label: "מזומן" });
 
       await clickThreeTimesSynchronously(page, "רישום התשלום");
@@ -365,6 +399,7 @@ test_.describe("INC-1 / INC-2: the income form", () => {
 
       await page.getByRole("link", { name: "הכנסה חדשה" }).click();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("הכנסה חדשה");
+      await incomeFormReady(page);
       await field.client(page).selectOption({ label: `ייעוץ ${token}` });
       await expect(field.project(page)).toHaveValue("");
       await field.amount(page).fill("750.50");
@@ -411,7 +446,7 @@ test_.describe("INC-1 / INC-2: the income form", () => {
         amount: 5_000,
         due_date: "2099-01-01",
       });
-      await page.goto("/incomes/new");
+      await gotoIncomeForm(page, "/incomes/new");
 
       await field.client(page).selectOption({ label: `לקוח ${token}` });
       await expect(field.project(page).locator("option")).toHaveCount(3);
@@ -435,7 +470,7 @@ test_.describe("INC-1 / INC-2: the income form", () => {
     "INC-1: errors are shown next to the fields in Hebrew; the input is kept and the first error focused",
     async ({ page, token, seedClient }) => {
       await seedClient({ name: `שגיאות ${token}` });
-      await page.goto("/incomes/new");
+      await gotoIncomeForm(page, "/incomes/new");
       await field.amount(page).fill("0");
       await field.date(page).fill(isoDaysFromToday(2));
 
@@ -469,7 +504,7 @@ test_.describe("INC-1 / INC-2: the income form", () => {
         received_date: isoDaysFromToday(0),
         amount: 20_000,
       });
-      await page.goto("/incomes");
+      await gotoIncomesList(page);
       await page.getByLabel("לקוח").selectOption({ label: `לקוח ${token}` });
       await page
         .getByRole("list", { name: "רשימת ההכנסות" })
@@ -477,6 +512,7 @@ test_.describe("INC-1 / INC-2: the income form", () => {
         .click();
 
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("עריכת הכנסה");
+      await incomeFormReady(page);
       await expect(field.amount(page)).toHaveValue("200");
       await expect(field.method(page)).toHaveValue("cash");
       await field.amount(page).fill("300");
@@ -516,6 +552,7 @@ test_.describe("INC-1 / INC-2: the income form", () => {
       const item = milestoneItem(page, `מקדמה ${token}`);
       await expect(item).toContainText(`יתרה: ${shekels(60_000)}`);
       await item.getByRole("link", { name: /^עריכת תשלום/ }).click();
+      await incomeFormReady(page);
 
       await page.getByRole("button", { name: "מחיקת הכנסה" }).click();
       const dialog = page.getByRole("dialog", { name: "למחוק את ההכנסה?" });
@@ -537,6 +574,28 @@ test_.describe("INC-1 / INC-2: the income form", () => {
 });
 
 test_.describe("INC-1: the incomes list", () => {
+  test_(
+    "INC-1: the filters and the form's linked selects are disabled until the page is interactive",
+    async ({ page, token, seedClient }) => {
+      // The form is shown only when a client exists.
+      await seedClient({ name: `הידרציה ${token}` });
+      // The server-rendered page, before any script runs: a choice made there would be reset
+      // by hydration, so the controls cannot take one yet.
+      const list = await (await page.request.get("/incomes")).text();
+      const form = await (await page.request.get("/incomes/new")).text();
+      expect(list).toMatch(/<input(?=[^>]*id="incomes-month")(?=[^>]*disabled)/);
+      expect(list).toMatch(/<select(?=[^>]*id="incomes-client")(?=[^>]*disabled)/);
+      for (const name of ["client_id", "project_id", "milestone_id"]) {
+        expect(form).toMatch(new RegExp(`<select(?=[^>]*name="${name}")(?=[^>]*disabled)`));
+        // A form sent before hydration still carries the value.
+        expect(form).toMatch(new RegExp(`<input type="hidden" name="${name}"`));
+      }
+
+      await gotoIncomesList(page);
+      await expect(page.getByLabel("לקוח")).toBeEnabled();
+    },
+  );
+
   test_(
     "INC-1: filters by month and client, newest first, with the month total and paging",
     async ({ page, token, seedClient, seedIncome }) => {
@@ -560,9 +619,9 @@ test_.describe("INC-1: the incomes list", () => {
         payment_method: "cash",
       }));
       expect((await createServiceRoleClient().from("incomes").insert(rows)).error).toBeNull();
-      await page.goto("/incomes");
+      await gotoIncomesList(page);
 
-      await page.getByLabel("חודש").fill("1906-03");
+      await chooseMonth(page, "1906-03");
       await page.getByLabel("לקוח").selectOption({ label: `סינון ${token}` });
 
       const list = page.getByRole("list", { name: "רשימת ההכנסות" });
@@ -579,7 +638,7 @@ test_.describe("INC-1: the incomes list", () => {
       );
 
       await page.getByLabel("לקוח").selectOption({ label: `אחר ${token}` });
-      await page.getByLabel("חודש").fill("1906-05");
+      await chooseMonth(page, "1906-05");
       await expect(list.getByRole("listitem")).toHaveCount(50);
       await expect(page.locator("dd").filter({ hasText: shekels(5_100) })).toContainText(
         "51 הכנסות",
@@ -588,7 +647,7 @@ test_.describe("INC-1: the incomes list", () => {
       await expect(list.getByRole("listitem")).toHaveCount(51);
       await expect(list.getByRole("listitem").nth(50).getByRole("link")).toBeFocused();
 
-      await page.getByLabel("חודש").fill("1906-06");
+      await chooseMonth(page, "1906-06");
       await expect(page.getByText("אין הכנסות בחודש הזה.")).toBeVisible();
     },
   );
@@ -598,13 +657,18 @@ test_.describe("INC-1: the incomes list", () => {
     async ({ page, token, seedClient, seedIncome }) => {
       const clientId = await seedClient({ name: `כשל ${token}` });
       await seedIncome({ client_id: clientId, received_date: "1906-07-07", amount: 700 });
-      await page.goto("/incomes");
-      await page.getByLabel("חודש").fill("1906-07");
+      await gotoIncomesList(page);
+      await chooseMonth(page, "1906-07");
       await page.getByLabel("לקוח").selectOption({ label: `כשל ${token}` });
       const list = page.getByRole("list", { name: "רשימת ההכנסות" });
+      // Both filters have loaded (the month alone may also show exactly one income).
+      await expect(
+        page.getByText(`סה״כ הכנסות ב-07/1906, לקוח: כשל ${token}`, { exact: true }),
+      ).toBeVisible();
       await expect(list.getByRole("listitem")).toHaveCount(1);
       const restore = await failServerActions(page, "abort");
 
+      // Not chooseMonth: the failed load puts the shown month back.
       await page.getByLabel("חודש").fill("1906-08");
 
       await expect(
@@ -734,7 +798,7 @@ test_.describe("M2.1-10: failed requests and ended sessions", () => {
           seedProject,
           seedMilestone,
         });
-        await page.goto(`/incomes/new?milestone=${milestoneId}&from=project`);
+        await gotoIncomeForm(page, `/incomes/new?milestone=${milestoneId}&from=project`);
         await field.amount(page).fill("123");
         await field.method(page).selectOption({ label: "מזומן" });
         const restore = await failServerActions(page, mode);
@@ -754,7 +818,7 @@ test_.describe("M2.1-10: failed requests and ended sessions", () => {
     "INC-1: saving while offline shows the inline error and does not redirect",
     async ({ page, context, token, seedClient }) => {
       const clientId = await seedClient({ name: `לא מקוון ${token}` });
-      await page.goto("/incomes/new");
+      await gotoIncomeForm(page, "/incomes/new");
       await field.client(page).selectOption({ label: `לא מקוון ${token}` });
       await field.amount(page).fill("10");
       await field.method(page).selectOption({ label: "מזומן" });
@@ -775,7 +839,7 @@ test_.describe("M2.1-10: failed requests and ended sessions", () => {
     async ({ page, token, seedClient, seedIncome }) => {
       const clientId = await seedClient({ name: `מחיקה ${token}` });
       const id = await seedIncome({ client_id: clientId, received_date: "2026-01-01", amount: 1 });
-      await page.goto(`/incomes/${id}/edit`);
+      await gotoIncomeForm(page, `/incomes/${id}/edit`);
       const restore = await failServerActions(page, "500");
 
       await page.getByRole("button", { name: "מחיקת הכנסה" }).click();
@@ -797,7 +861,7 @@ test_.describe("M2.1-10: failed requests and ended sessions", () => {
         seedProject,
         seedMilestone,
       });
-      await page.goto(`/incomes/new?milestone=${milestoneId}&from=project`);
+      await gotoIncomeForm(page, `/incomes/new?milestone=${milestoneId}&from=project`);
       await field.method(page).selectOption({ label: "מזומן" });
       await context.clearCookies();
 
@@ -854,7 +918,7 @@ test_.describe("M2.1-12: layout and CSP", () => {
         }
       }
       // Exercise zod, the overpayment warning and the Server Actions in the browser as well.
-      await page.goto(`/incomes/new?milestone=${milestoneId}&from=project`);
+      await gotoIncomeForm(page, `/incomes/new?milestone=${milestoneId}&from=project`);
       await field.amount(page).fill("abc");
       await page.getByRole("button", { name: "רישום התשלום" }).click();
       await expect(field.amount(page)).toHaveAttribute("aria-invalid", "true");

@@ -17,8 +17,14 @@ type RedirectNoticeProps = {
 
 /**
  * A one-time confirmation after a redirect ("הלקוח נשמר."), announced politely. The `?notice=`
- * parameter is removed with history.replaceState, so a reload or a later refresh of the page
- * does not show it again.
+ * parameter is removed from the address with history.replaceState, so a reload or a later
+ * refresh of the page does not show it again.
+ *
+ * The state passed to replaceState must not be the router's own (window.history.state):
+ * Next.js takes a call with its own state for one of its internal calls and leaves its
+ * router out of it, so the router kept the old address, put `?notice=` back after the
+ * refresh that follows an in-page Server Action, and the page rendered the notice again.
+ * With other state, Next.js updates its router to the new address as well.
  */
 export function RedirectNotice({ message }: RedirectNoticeProps) {
   const [shown, setShown] = useState<string | undefined>(undefined);
@@ -29,7 +35,7 @@ export function RedirectNotice({ message }: RedirectNoticeProps) {
       const url = new URL(window.location.href);
       if (url.searchParams.has(NOTICE_PARAM)) {
         url.searchParams.delete(NOTICE_PARAM);
-        window.history.replaceState(window.history.state, "", url);
+        window.history.replaceState(null, "", url);
       }
     }
     return () => window.clearTimeout(timer);

@@ -1,110 +1,20 @@
 import { randomUUID } from "node:crypto";
 
-import type { Page, Route } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
-import { createServiceRoleClient, expect, test } from "./support/auth-fixtures";
-
-const VIEWPORT_WIDTHS_BY_PROJECT: Record<string, number[]> = {
-  android: [360, 412],
-  desktop: [1280],
-};
-const MIN_TOUCH_TARGET = 44;
-
-type SeedClient = {
-  name: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  notes?: string;
-  archived_at?: string;
-};
-
-/**
- * Each test gets a unique token inside every client name it creates, so parallel tests and
- * leftovers never collide, and cleanup deletes exactly its own rows.
- */
-const test_ = test.extend<{ token: string; seedClient: (client: SeedClient) => Promise<string> }>({
-  token: async ({}, provide) => {
-    const token = `e2e${randomUUID().slice(0, 8)}`;
-    await provide(token);
-    const { error } = await createServiceRoleClient()
-      .from("clients")
-      .delete()
-      .ilike("name", `%${token}%`);
-    if (error) {
-      throw new Error("Could not clean up E2E clients", { cause: error });
-    }
-  },
-  seedClient: async ({}, provide) => {
-    const service = createServiceRoleClient();
-    await provide(async (client) => {
-      const { data, error } = await service.from("clients").insert(client).select("id").single();
-      if (error) {
-        throw new Error("Could not seed a client", { cause: error });
-      }
-      return data.id as string;
-    });
-  },
-});
+import { createServiceRoleClient, expect, test_ } from "./support/data-fixtures";
+import {
+  MIN_TOUCH_TARGET,
+  VIEWPORT_WIDTHS_BY_PROJECT,
+  activeElementText,
+  clickThreeTimesSynchronously,
+  failServerActions,
+  trackCspViolations,
+} from "./support/helpers";
 
 test_.beforeEach(async ({ signIn }) => {
   await signIn({ role: "owner" });
 });
-
-/**
- * Records CSP violations from the first byte of every navigation, through the
- * securitypolicyviolation event (as shell.spec.ts does) and console errors.
- */
-async function trackCspViolations(page: Page): Promise<string[]> {
-  const violations: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error" && message.text().includes("Content Security Policy")) {
-      violations.push(message.text());
-    }
-  });
-  await page.exposeFunction("__reportCspViolation", (violation: string) => {
-    violations.push(violation);
-  });
-  await page.addInitScript(() => {
-    document.addEventListener("securitypolicyviolation", (event) => {
-      const report = (window as unknown as { __reportCspViolation: (v: string) => void })
-        .__reportCspViolation;
-      report(`${event.violatedDirective}: ${event.blockedURI} (${event.sourceFile})`);
-    });
-  });
-  return violations;
-}
-
-type FailureMode = "abort" | "500";
-
-/**
- * Makes every Server Action request fail (a lost connection or a server error) until the
- * returned function is called. Server Actions are POSTs carrying a Next-Action header.
- */
-async function failServerActions(page: Page, mode: FailureMode): Promise<() => Promise<void>> {
-  const pattern = "**/*";
-  const handler = async (route: Route) => {
-    const request = route.request();
-    if (request.method() === "POST" && request.headers()["next-action"]) {
-      if (mode === "abort") {
-        await route.abort("internetdisconnected");
-      } else {
-        await route.fulfill({ status: 500, contentType: "text/plain", body: "error" });
-      }
-      return;
-    }
-    await route.continue();
-  };
-  await page.route(pattern, handler);
-  return () => page.unroute(pattern, handler);
-}
-
-function activeElementText(page: Page) {
-  return page.evaluate(() => {
-    const element = document.activeElement;
-    return element ? `${element.tagName}:${(element.textContent ?? "").trim()}` : "none";
-  });
-}
 
 function nameField(page: Page) {
   return page.getByRole("textbox", { name: /^שם/ });
@@ -492,11 +402,12 @@ test_.describe("CLI-4: client card", () => {
 });
 
 test_.describe("M1.1-8: navigation", () => {
-  test_("M1.1-8: shows only בית and לקוחות and marks the current item", async ({ page }) => {
+  test_("M1.1-8: shows only existing screens and marks the current item", async ({ page }) => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "ניווט ראשי" });
 
-    await expect(nav.getByRole("link")).toHaveText(["בית", "לקוחות"]);
+    // PRJ-1 (M1.2) adds פרויקטים.
+    await expect(nav.getByRole("link")).toHaveText(["בית", "לקוחות", "פרויקטים"]);
     await expect(nav.getByRole("link", { name: "בית" })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: "לקוחות" })).not.toHaveAttribute(
       "aria-current",
@@ -513,7 +424,7 @@ test_.describe("M1.1-8: navigation", () => {
     const weights = await nav
       .getByRole("link")
       .evaluateAll((links) => links.map((link) => getComputedStyle(link).fontWeight));
-    expect(weights).toEqual(["400", "700"]);
+    expect(weights).toEqual(["400", "700", "400"]);
   });
 
   test_(
@@ -744,6 +655,71 @@ test_.describe("M1.1-3: failed requests keep the screen and the input", () => {
         "הפעולה לא בוצעה. בדקו את החיבור ונסו שוב.",
       );
       await expect(dialog.getByRole("button", { name: "מחיקה לצמיתות" })).toBeFocused();
+      await restore();
+    },
+  );
+});
+
+test_.describe("M1.2-11: duplicate submits, offline and rate limiting", () => {
+  test_("CLI-1: three clicks in the same tick create one client", async ({ page, token }) => {
+    await page.goto("/clients/new");
+    await nameField(page).fill(`פעם אחת ${token}`);
+
+    await clickThreeTimesSynchronously(page, "שמירת לקוח");
+
+    await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
+    await page.waitForLoadState("networkidle");
+    const { data, error } = await createServiceRoleClient()
+      .from("clients")
+      .select("id")
+      .eq("name", `פעם אחת ${token}`);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+  });
+
+  test_(
+    "CLI-1: saving while offline shows the inline error, keeps the input and stays",
+    async ({ page, context, token }) => {
+      await page.goto("/clients/new");
+      await nameField(page).fill(`לא מקוון ${token}`);
+      await page.getByRole("textbox", { name: "הערות" }).fill("הערה");
+      await context.setOffline(true);
+
+      await page.getByRole("button", { name: "שמירת לקוח" }).click();
+
+      await expect(page.getByRole("alert").first()).toHaveText(
+        "לא ניתן לשמור כרגע. בדקו את החיבור ונסו שוב.",
+      );
+      await expect(page).toHaveURL(/\/clients\/new$/);
+      await expect(nameField(page)).toHaveValue(`לא מקוון ${token}`);
+      await expect(page.getByRole("textbox", { name: "הערות" })).toHaveValue("הערה");
+
+      await context.setOffline(false);
+      await page.getByRole("button", { name: "שמירת לקוח" }).click();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(`לא מקוון ${token}`);
+    },
+  );
+
+  test_(
+    "AUTH-3: a rate-limited session check (429) after a failed save does not sign out",
+    async ({ page, token }) => {
+      await page.goto("/clients/new");
+      await nameField(page).fill(`הגבלה ${token}`);
+      await page.route("**/auth/v1/user", (route) =>
+        route.fulfill({
+          status: 429,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "over_request_rate_limit", message: "rate limit" }),
+        }),
+      );
+      const restore = await failServerActions(page, "abort");
+
+      await page.getByRole("button", { name: "שמירת לקוח" }).click();
+
+      await expect(page.getByRole("alert").first()).toHaveText(
+        "לא ניתן לשמור כרגע. בדקו את החיבור ונסו שוב.",
+      );
+      await expect(page).toHaveURL(/\/clients\/new$/);
       await restore();
     },
   );

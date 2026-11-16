@@ -502,9 +502,7 @@ describe("search_projects", () => {
     expect(await searchIds({ p_archived: false, p_query: searchKey })).not.toContain(
       archivedProject.id,
     );
-    expect(await searchIds({ p_archived: true, p_query: searchKey })).toEqual([
-      archivedProject.id,
-    ]);
+    expect(await searchIds({ p_archived: true, p_query: searchKey })).toEqual([archivedProject.id]);
   });
 
   it("PRJ-1: LIKE wildcards in the query match literally", async () => {

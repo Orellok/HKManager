@@ -635,14 +635,21 @@ test_.describe("MS-6: open debts", () => {
       const list = page.getByRole("list", { name: "רשימת החובות הפתוחים" });
       const mine = list.getByRole("listitem").filter({ hasText: token });
       // The list is global: debts of tests running at the same time may come first and push
-      // these past the first page, so load pages until both are shown.
+      // these past the first page, so load pages until both are shown. Those tests also add
+      // and remove debts meanwhile, which can shift a row across a page boundary between two
+      // loads; a pass that misses one starts over from a fresh page.
       const loadMore = page.getByRole("button", { name: "הצגת חובות נוספים" });
-      while ((await mine.count()) < 2 && (await loadMore.isVisible())) {
-        const shown = await list.getByRole("listitem").count();
-        await loadMore.click();
-        await expect(list.getByRole("listitem")).not.toHaveCount(shown);
-      }
-      await expect(mine).toHaveCount(2);
+      const showMine = () =>
+        expect(async () => {
+          await page.reload();
+          while ((await mine.count()) < 2 && (await loadMore.isVisible())) {
+            const shown = await list.getByRole("listitem").count();
+            await loadMore.click();
+            await expect(list.getByRole("listitem")).not.toHaveCount(shown, { timeout: 5_000 });
+          }
+          expect(await mine.count()).toBe(2);
+        }).toPass({ timeout: 60_000 });
+      await showMine();
       await expect(mine.nth(0)).toContainText(`ישן ${token}`);
       await expect(mine.nth(0)).toContainText(ddmmyyyy(older));
       await expect(mine.nth(0)).toContainText(
@@ -661,6 +668,9 @@ test_.describe("MS-6: open debts", () => {
         .click();
       await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
       await page.goBack();
+      // Back on the list, only its first page is shown again.
+      await expect(page).toHaveURL(/\/debts$/);
+      await showMine();
       await mine
         .nth(1)
         .getByRole("link", { name: `חייב ${token}` })

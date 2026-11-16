@@ -9,6 +9,7 @@ import {
   getClientPaymentSummary,
   getIncomesMonthSummary,
   getProjectPaidTotal,
+  listIncomeChoices,
   listIncomes,
   saveIncome,
   softDeleteIncome,
@@ -478,6 +479,38 @@ describe("incomes schema and owner decisions", () => {
   });
 });
 
+describe("SPEC 6: the soft delete time comes from the database", () => {
+  it("SPEC 6: a deleted_at in the past or the future is replaced with the time of the delete", async () => {
+    const client = await insertClient();
+    const past = await insertIncome(owner.client, { client_id: client.id });
+    const future = await insertIncome(owner.client, { client_id: client.id });
+    const before = Date.now();
+
+    const results = await Promise.all([
+      owner.client
+        .from(TABLE)
+        .update({ deleted_at: "2000-01-01T00:00:00Z" })
+        .eq("id", past.data!.id)
+        .select("deleted_at")
+        .single<{ deleted_at: string }>(),
+      owner.client
+        .from(TABLE)
+        .update({ deleted_at: "2099-01-01T00:00:00Z" })
+        .eq("id", future.data!.id)
+        .select("deleted_at")
+        .single<{ deleted_at: string }>(),
+    ]);
+
+    for (const { data, error } of results) {
+      expect(error).toBeNull();
+      const stamped = Date.parse(data!.deleted_at);
+      // The local database and this process share a clock; allow for request time.
+      expect(stamped).toBeGreaterThanOrEqual(before - 5_000);
+      expect(stamped).toBeLessThanOrEqual(Date.now() + 5_000);
+    }
+  });
+});
+
 describe("incomes consistency (criterion 1)", () => {
   it("INC-1: a milestone of another project is refused", async () => {
     const { client, project } = await setup();
@@ -854,6 +887,36 @@ describe("MS-5: overpayment needs a confirmation that matches the current balanc
     expect(
       await saveIncome(owner.client, null, incomeInput({ client_id: randomUUID() }), null),
     ).toEqual({ status: "refused", refusal: "reference_missing" });
+  });
+});
+
+describe("INC-1: income form choices", () => {
+  it("INC-1: lists every milestone of a client's projects, beyond PostgREST's 1000-row limit", async () => {
+    const client = await insertClient();
+    const projects = [];
+    for (let index = 0; index < 11; index += 1) {
+      projects.push(await insertProject(client.id));
+    }
+    const rows = projects.flatMap((project) =>
+      Array.from({ length: 100 }, (_, index) => ({
+        project_id: project.id,
+        description: `אבן ${index}`,
+        amount: 1,
+        due_date: "2026-01-01",
+      })),
+    );
+    expect((await service.from("milestones").insert(rows)).error).toBeNull();
+
+    const choices = await listIncomeChoices(owner.client, client.id, {
+      projectId: null,
+      milestoneId: null,
+    });
+
+    expect(choices.projects).toHaveLength(11);
+    expect(choices.projects.every((project) => project.milestones.length === 100)).toBe(true);
+    expect(choices.projects[0].milestones.map((milestone) => milestone.description)).toEqual(
+      Array.from({ length: 100 }, (_, index) => `אבן ${index}`),
+    );
   });
 });
 

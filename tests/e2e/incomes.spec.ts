@@ -243,7 +243,7 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
   );
 
   test_(
-    "MS-5: a confirmation is re-checked when the amount was changed after the warning",
+    "MS-5: changing a field after the warning withdraws it; saving again warns with the new amount",
     async ({ page, token, seedClient, seedProject, seedMilestone }) => {
       const { clientId, projectId } = await seedMilestoneFor({
         token,
@@ -260,13 +260,48 @@ test_.describe("MS-4: recording a payment for a milestone", () => {
       await expect(warning).toContainText(shekels(110_000));
 
       await field.amount(page).fill("1,300");
-      await warning.getByRole("button", { name: "כן, לרשום את התשלום" }).click();
 
+      await expect(warning).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "כן, לרשום את התשלום" })).toHaveCount(0);
+      await page.getByRole("button", { name: "רישום התשלום" }).click();
       await expect(warning).toContainText(`הסכום (${shekels(130_000)})`);
       expect(await incomesOf(clientId)).toEqual([]);
+
+      // Any field counts, not only the amount.
+      await field.notes(page).fill("הערה");
+      await expect(warning).toHaveCount(0);
+      await page.getByRole("button", { name: "רישום התשלום" }).click();
       await warning.getByRole("button", { name: "כן, לרשום את התשלום" }).click();
       await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
       expect((await incomesOf(clientId)).map((income) => income.amount)).toEqual([130_000]);
+    },
+  );
+
+  test_(
+    "MS-5: pressing Enter in a field after the warning does not confirm the overpayment",
+    async ({ page, token, seedClient, seedProject, seedMilestone }) => {
+      const { clientId, milestoneId } = await seedMilestoneFor({
+        token,
+        seedClient,
+        seedProject,
+        seedMilestone,
+      });
+      await page.goto(`/incomes/new?milestone=${milestoneId}&from=project`);
+      await field.amount(page).fill("1,250");
+      await field.method(page).selectOption({ label: "מזומן" });
+      await page.getByRole("button", { name: "רישום התשלום" }).click();
+      const warning = page.getByRole("alert").filter({ hasText: "שימו לב:" });
+      await expect(warning).toBeVisible();
+
+      // Focus only (no change), then Enter: the form submits with its first submit button.
+      await field.amount(page).focus();
+      await page.keyboard.press("Enter");
+
+      // The server answered with a new warning: focus moves back to it.
+      await expect(warning).toBeFocused();
+      await expect(warning).toContainText(`הסכום (${shekels(125_000)})`);
+      await expect(page).toHaveURL(/\/incomes\/new\?/);
+      expect(await incomesOf(clientId)).toEqual([]);
     },
   );
 
@@ -657,18 +692,23 @@ test_.describe("PRJ-3 / CLI-4 / MS-6: balances on the cards and in open debts", 
       });
       const list = page.getByRole("list", { name: "רשימת החובות הפתוחים" });
       const mine = list.getByRole("listitem").filter({ hasText: token });
-      const loadAll = async () => {
-        await page.goto("/debts");
-        const loadMore = page.getByRole("button", { name: "הצגת חובות נוספים" });
-        while ((await mine.count()) === 0 && (await loadMore.isVisible())) {
-          const shown = await list.getByRole("listitem").count();
-          await loadMore.click();
-          await expect(list.getByRole("listitem")).not.toHaveCount(shown);
-        }
+      // Load every page until this test's debt shows (or the list ends). Other tests add and
+      // remove debts meanwhile, which can shift a row across a page boundary, so a pass that
+      // does not see the expected count starts over from a fresh page.
+      const expectDebtCount = async (count: number) => {
+        await expect(async () => {
+          await page.goto("/debts");
+          const loadMore = page.getByRole("button", { name: "הצגת חובות נוספים" });
+          while ((await mine.count()) === 0 && (await loadMore.isVisible())) {
+            const shown = await list.getByRole("listitem").count();
+            await loadMore.click();
+            await expect(list.getByRole("listitem")).not.toHaveCount(shown, { timeout: 5_000 });
+          }
+          expect(await mine.count()).toBe(count);
+        }).toPass({ timeout: 60_000 });
       };
 
-      await loadAll();
-      await expect(mine).toHaveCount(1);
+      await expectDebtCount(1);
       await expect(mine).toContainText(shekels(70_000));
 
       await seedIncome({
@@ -678,8 +718,7 @@ test_.describe("PRJ-3 / CLI-4 / MS-6: balances on the cards and in open debts", 
         received_date: isoDaysFromToday(0),
         amount: 70_000,
       });
-      await loadAll();
-      await expect(mine).toHaveCount(0);
+      await expectDebtCount(0);
     },
   );
 });

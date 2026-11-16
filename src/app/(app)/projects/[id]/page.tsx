@@ -6,7 +6,9 @@ import { ProjectStatusBadge } from "@/components/project-status-badge";
 import { RedirectNotice } from "@/components/redirect-notice";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { clientPath } from "@/lib/clients/paths";
-import { formatIsoDate } from "@/lib/dates";
+import { formatIsoDate, todayInJerusalem } from "@/lib/dates";
+import { logDbFailure } from "@/lib/log";
+import { listProjectMilestones, type Milestone } from "@/lib/milestones/queries";
 import { formatAgorot } from "@/lib/money";
 import { NOTICE_PARAM, noticeMessage } from "@/lib/notices";
 import {
@@ -15,8 +17,10 @@ import {
   PROJECT_NOTICE_MESSAGES,
   editProjectPath,
 } from "@/lib/projects/paths";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { loadProjectOrNotFound } from "./load-project";
+import { ProjectMilestones } from "./project-milestones";
 import { ProjectStatusActions } from "./project-status-actions";
 
 type DetailRow = { label: string; value: ReactNode | null };
@@ -24,14 +28,22 @@ type DetailRow = { label: string; value: ReactNode | null };
 const LINK_CLASSES = "inline-flex min-h-11 items-center underline underline-offset-4 wrap-anywhere";
 
 /**
- * PRJ-3: the project card. M1.2 shows the details; "שולם" and "יתרה" come with incomes (M2),
- * milestones with M1.3.
+ * PRJ-3: the project card: details and milestones (MS-1..3). "שולם" and "יתרה" come with
+ * incomes (M2).
  */
 export default async function ProjectPage({ params, searchParams }: PageProps<"/projects/[id]">) {
   await requireAllowedUser();
   const project = await loadProjectOrNotFound(params);
   const notice = noticeMessage(PROJECT_NOTICE_MESSAGES, (await searchParams)[NOTICE_PARAM]);
   const isArchived = project.archived_at !== null;
+  let milestones: Milestone[];
+  try {
+    milestones = await listProjectMilestones(await createSupabaseServerClient(), project.id);
+  } catch (error) {
+    // Logged by code only; the error boundary gets no database details (SPEC 8).
+    logDbFailure("milestones", "list", error);
+    throw new Error("Could not load the project's milestones");
+  }
 
   const details: DetailRow[] = [
     {
@@ -99,6 +111,13 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           isArchived={isArchived}
         />
       </div>
+
+      <ProjectMilestones
+        projectId={project.id}
+        contractAmount={project.contract_amount}
+        milestones={milestones}
+        today={todayInJerusalem()}
+      />
     </article>
   );
 }

@@ -46,6 +46,8 @@ const FOREIGN_KEY_VIOLATION = "23503";
 const REFERENCES_MISMATCH = "HKI01";
 const MILESTONE_CANCELLED = "HKI02";
 const DATE_IN_FUTURE = "HKI03";
+/** Raised by incomes_locked_by_document(): INC-4, the income has a receipt. */
+const HAS_RECEIPT = "HKI05";
 
 export type Income = {
   id: string;
@@ -96,13 +98,18 @@ export async function getIncome(supabase: SupabaseClient, id: string): Promise<I
 
 /** Why the database refused to save an income. */
 export type IncomeRefusal =
-  "references_mismatch" | "milestone_cancelled" | "date_in_future" | "reference_missing";
+  | "references_mismatch"
+  | "milestone_cancelled"
+  | "date_in_future"
+  | "reference_missing"
+  | "has_receipt";
 
 const REFUSALS: Record<string, IncomeRefusal> = {
   [REFERENCES_MISMATCH]: "references_mismatch",
   [MILESTONE_CANCELLED]: "milestone_cancelled",
   [DATE_IN_FUTURE]: "date_in_future",
   [FOREIGN_KEY_VIOLATION]: "reference_missing",
+  [HAS_RECEIPT]: "has_receipt",
 };
 
 export type SaveIncomeResult =
@@ -158,9 +165,12 @@ export async function saveIncome(
 }
 
 export type DeleteIncomeResult =
-  { status: "deleted"; projectId: string | null } | { status: "not_found" };
+  | { status: "deleted"; projectId: string | null }
+  | { status: "not_found" }
+  /** INC-4: the income has a receipt. */
+  | { status: "has_receipt" };
 
-/** SPEC 6: soft-deletes an income (the audit trigger records it). */
+/** SPEC 6: soft-deletes an income (the audit trigger records it); INC-4 may refuse it. */
 export async function softDeleteIncome(
   supabase: SupabaseClient,
   id: string,
@@ -171,6 +181,9 @@ export async function softDeleteIncome(
     .eq("id", id)
     .is("deleted_at", null)
     .select("project_id");
+  if (error?.code === HAS_RECEIPT) {
+    return { status: "has_receipt" };
+  }
   if (error) {
     throw new Error("Could not delete the income", { cause: error });
   }
@@ -191,6 +204,8 @@ export type IncomeListItem = {
   project_name: string | null;
   milestone_id: string | null;
   milestone_description: string | null;
+  /** INC-3: whether a receipt is recorded for the income. */
+  receipt_issued: boolean;
 };
 
 export type IncomeListPage = ListPage<IncomeListItem>;
@@ -202,10 +217,24 @@ export type IncomeListFilter = {
   clientId: string | null;
 };
 
-type IncomeListRow = Omit<IncomeListItem, "amount" | "payment_method"> & {
+type IncomeListRow = Omit<IncomeListItem, "amount" | "payment_method" | "receipt_issued"> & {
   amount: unknown;
   payment_method: unknown;
+  receipt_issued: unknown;
 };
+
+/** A row of list_incomes() or list_pending_receipts(), checked. */
+export function toIncomeListItem(row: IncomeListRow): IncomeListItem {
+  if (typeof row.receipt_issued !== "boolean") {
+    throw new RangeError("The database returned no receipt status");
+  }
+  return {
+    ...row,
+    amount: agorotFromDb(row.amount) ?? 0,
+    payment_method: paymentMethodFromDb(row.payment_method),
+    receipt_issued: row.receipt_issued,
+  };
+}
 
 /** INC-1: one page of a month's incomes, newest received date first. */
 export async function listIncomes(
@@ -225,11 +254,7 @@ export async function listIncomes(
   }
   const rows = (data ?? []) as IncomeListRow[];
   return {
-    items: rows.slice(0, INCOMES_PAGE_SIZE).map((row) => ({
-      ...row,
-      amount: agorotFromDb(row.amount) ?? 0,
-      payment_method: paymentMethodFromDb(row.payment_method),
-    })),
+    items: rows.slice(0, INCOMES_PAGE_SIZE).map(toIncomeListItem),
     hasMore: rows.length > INCOMES_PAGE_SIZE,
   };
 }
@@ -253,7 +278,10 @@ export async function getIncomesMonthSummary(
 export type ProjectIncome = Pick<
   Income,
   "id" | "milestone_id" | "received_date" | "amount" | "payment_method"
->;
+> & {
+  /** INC-3: whether a receipt is recorded for the income. */
+  receipt_issued: boolean;
+};
 
 /** PRJ-3: a project's incomes that are not deleted, oldest received date first. */
 export async function listProjectIncomes(
@@ -262,7 +290,7 @@ export async function listProjectIncomes(
 ): Promise<ListPage<ProjectIncome>> {
   const { data, error } = await supabase
     .from(TABLE)
-    .select("id, milestone_id, received_date, amount, payment_method")
+    .select("id, milestone_id, received_date, amount, payment_method, documents(id)")
     .eq("project_id", projectId)
     .is("deleted_at", null)
     .order("received_date")
@@ -272,15 +300,17 @@ export async function listProjectIncomes(
   if (error) {
     throw new Error("Could not list the project's incomes", { cause: error });
   }
-  const rows = data as (Omit<ProjectIncome, "amount" | "payment_method"> & {
+  const rows = data as (Omit<ProjectIncome, "amount" | "payment_method" | "receipt_issued"> & {
     amount: unknown;
     payment_method: unknown;
+    documents: { id: string } | { id: string }[] | null;
   })[];
   return {
-    items: rows.slice(0, PROJECT_INCOMES_LIMIT).map((row) => ({
+    items: rows.slice(0, PROJECT_INCOMES_LIMIT).map(({ documents, ...row }) => ({
       ...row,
       amount: agorotFromDb(row.amount) ?? 0,
       payment_method: paymentMethodFromDb(row.payment_method),
+      receipt_issued: Array.isArray(documents) ? documents.length > 0 : documents !== null,
     })),
     hasMore: rows.length > PROJECT_INCOMES_LIMIT,
   };

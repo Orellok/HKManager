@@ -6,9 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import { REQUEST_FAILED_MESSAGE } from "@/components/archive-delete-actions";
 import { Button, buttonClasses } from "@/components/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ReceiptStatusBadge } from "@/components/receipt-status-badge";
 import { useGuardedTransition } from "@/components/use-guarded-transition";
 import { NO_ACTION_STATUS, type ActionStatus } from "@/lib/action-status";
 import { callServerAction } from "@/lib/auth/action-failure";
+import type { ReceiptStatus } from "@/lib/documents/status";
 import {
   cancelMilestoneAction,
   deleteMilestoneAction,
@@ -28,6 +30,8 @@ export type MilestonePaymentItem = {
   amount: string;
   paymentMethod: string;
   editHref: string;
+  /** INC-3. */
+  receiptStatus: ReceiptStatus;
 };
 
 /** A milestone as the card shows it, formatted on the server. */
@@ -219,10 +223,11 @@ export function MilestoneList({ projectId, items, headingId, emptyMessage }: Mil
                       key={payment.id}
                       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-1"
                     >
-                      <span className="flex flex-wrap gap-x-3">
+                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span>{payment.receivedDate}</span>
                         <span className="font-medium">{payment.amount}</span>
                         <span className="text-muted-foreground">{payment.paymentMethod}</span>
+                        <ReceiptStatusBadge status={payment.receiptStatus} />
                       </span>
                       <Link
                         href={payment.editHref}

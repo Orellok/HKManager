@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { buttonClasses } from "@/components/button";
 import { formatIsoDate } from "@/lib/dates";
+import { receiptStatus } from "@/lib/documents/status";
 import { editIncomePath, recordPaymentPath } from "@/lib/incomes/paths";
 import { PAYMENT_METHOD_LABELS } from "@/lib/incomes/payment-methods";
 import type { ProjectIncome } from "@/lib/incomes/queries";
@@ -47,6 +48,7 @@ export function toPaymentItem(income: ProjectIncome): MilestonePaymentItem {
     amount: formatAgorot(income.amount),
     paymentMethod: PAYMENT_METHOD_LABELS[income.payment_method],
     editHref: editIncomePath(income.id, "project"),
+    receiptStatus: receiptStatus(income.receipt_issued),
   };
 }
 

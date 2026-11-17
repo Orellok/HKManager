@@ -5,6 +5,10 @@ import { projectPath } from "@/lib/projects/paths";
 export const INCOMES_PATH = "/incomes";
 export const NEW_INCOME_PATH = "/incomes/new";
 
+/** DOC-5: `?view=pending` shows the incomes waiting for a receipt, of every month. */
+export const PENDING_VIEW = "pending";
+export const PENDING_RECEIPTS_PATH = `${INCOMES_PATH}?view=${PENDING_VIEW}`;
+
 /** `?milestone=<id>` records a payment for a milestone (MS-4); `?project=<id>` for a project. */
 export const MILESTONE_PARAM = "milestone";
 export const PROJECT_PARAM = "project";

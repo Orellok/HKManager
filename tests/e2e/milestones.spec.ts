@@ -687,13 +687,15 @@ test_.describe("MS-6: open debts", () => {
       test_.skip(testInfo.project.name !== "desktop", "Paging is checked on desktop only");
       const clientId = await seedClient({ name: `דפדוף ${token}` });
       const projectId = await seedProject({ client_id: clientId, name: `דפדוף ${token}` });
+      // Among the earliest dates the app accepts, one per parallel worker: these debts sort
+      // first in the global list, and no other test (or another worker running this one)
+      // seeds debts on the same day, so nothing can push them around between the pages.
+      const dueDate = `1900-01-${String((testInfo.parallelIndex % 28) + 1).padStart(2, "0")}`;
       const rows = Array.from({ length: 51 }, (_, index) => ({
         project_id: projectId,
         description: `חוב ${String(index + 1).padStart(2, "0")} ${token}`,
         amount: 100,
-        // The earliest date the app accepts: these debts sort first in the global list, so
-        // other tests' debts cannot push them around between the pages.
-        due_date: "1900-01-01",
+        due_date: dueDate,
       }));
       const { error } = await createServiceRoleClient().from("milestones").insert(rows);
       expect(error).toBeNull();
@@ -702,6 +704,9 @@ test_.describe("MS-6: open debts", () => {
         .getByRole("list", { name: "רשימת החובות הפתוחים" })
         .getByRole("listitem")
         .filter({ hasText: token });
+      // The list must be on screen before it is counted.
+      await expect(mine.first()).toBeVisible();
+      await expect(page.getByRole("button", { name: "הצגת חובות נוספים" })).toBeEnabled();
       const firstPageCount = await mine.count();
       expect(firstPageCount).toBeGreaterThan(0);
       expect(firstPageCount).toBeLessThan(51);

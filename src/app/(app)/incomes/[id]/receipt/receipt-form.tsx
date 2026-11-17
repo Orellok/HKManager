@@ -214,7 +214,7 @@ export function ReceiptForm({
         aria-describedby={errors.source ? SOURCE_ERROR_ID : undefined}
       >
         <legend className="text-sm font-medium">
-          הקבלה מצורפת כ<span className="text-muted-foreground font-normal"> {REQUIRED}</span>
+          צירוף הקבלה<span className="text-muted-foreground font-normal"> {REQUIRED}</span>
         </legend>
         <div className="flex flex-wrap gap-x-6">
           {(Object.keys(SOURCE_LABELS) as ReceiptSource[]).map((option) => (

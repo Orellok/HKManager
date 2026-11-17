@@ -65,9 +65,11 @@ export function CopyableDetails({ details }: { details: readonly CopyableDetail[
         {details.map((detail) => (
           <div
             key={detail.label}
-            className="grid items-center gap-x-4 gap-y-1 p-4 sm:grid-cols-[8rem_1fr_auto]"
+            className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 p-4 sm:grid-cols-[8rem_1fr_auto]"
           >
-            <dt className="text-muted-foreground text-sm">{detail.label}</dt>
+            <dt className="text-muted-foreground col-span-2 text-sm sm:col-span-1">
+              {detail.label}
+            </dt>
             <dd className="min-w-0 wrap-anywhere whitespace-pre-wrap">
               {manualCopy === detail.label && detail.copyValue !== null ? (
                 <input

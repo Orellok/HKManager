@@ -4,6 +4,7 @@ import { countFromDb } from "@/lib/db-numbers";
 import { MAX_MILESTONES_PER_PROJECT } from "@/lib/milestones/queries";
 import { agorotFromDb, agorotTotalFromDb, balanceAgorotFromDb } from "@/lib/money";
 import type { ListPage } from "@/lib/paged-list";
+import type { ClientOption } from "@/lib/projects/queries";
 
 import { monthStart } from "./month";
 import { isPaymentMethod, type PaymentMethod } from "./payment-methods";
@@ -448,4 +449,44 @@ async function listChoiceMilestones(
     }
     return data as ChoiceMilestoneRow[];
   });
+}
+
+/** Archived clients offered in the incomes list's client filter, by name. */
+export const ARCHIVED_FILTER_CLIENTS_LIMIT = 500;
+
+export type FilterClients = {
+  /** Archived clients that have incomes, by name, marked archived. */
+  options: ClientOption[];
+  /** More such clients exist than ARCHIVED_FILTER_CLIENTS_LIMIT. */
+  hasMore: boolean;
+};
+
+/**
+ * INC-1: archived clients with at least one income that is not deleted, for the incomes
+ * list's client filter (payments of archived clients are allowed, so their incomes must be
+ * reachable). Only the existence of an income is read, never the incomes themselves.
+ */
+export async function listArchivedClientsWithIncomes(
+  supabase: SupabaseClient,
+): Promise<FilterClients> {
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, name, incomes!inner(id)")
+    .not("archived_at", "is", null)
+    .is("incomes.deleted_at", null)
+    .order("name")
+    .order("id")
+    .limit(1, { referencedTable: "incomes" })
+    // One extra row tells whether more exist.
+    .limit(ARCHIVED_FILTER_CLIENTS_LIMIT + 1);
+  if (error) {
+    throw new Error("Could not list archived clients with incomes", { cause: error });
+  }
+  const rows = data as { id: string; name: string }[];
+  return {
+    options: rows
+      .slice(0, ARCHIVED_FILTER_CLIENTS_LIMIT)
+      .map(({ id, name }) => ({ id, name, archived: true })),
+    hasMore: rows.length > ARCHIVED_FILTER_CLIENTS_LIMIT,
+  };
 }

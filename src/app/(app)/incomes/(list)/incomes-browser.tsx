@@ -12,7 +12,12 @@ import { searchIncomesAction } from "@/lib/incomes/actions";
 import { MAX_MONTH, MIN_MONTH, formatMonth, isMonth } from "@/lib/incomes/month";
 import { NEW_INCOME_PATH, editIncomePath } from "@/lib/incomes/paths";
 import { PAYMENT_METHOD_LABELS } from "@/lib/incomes/payment-methods";
-import type { IncomeListItem, IncomeListPage, IncomesMonthSummary } from "@/lib/incomes/queries";
+import {
+  ARCHIVED_FILTER_CLIENTS_LIMIT,
+  type IncomeListItem,
+  type IncomeListPage,
+  type IncomesMonthSummary,
+} from "@/lib/incomes/queries";
 import { formatAgorot } from "@/lib/money";
 import { appendPage, type PagedListState } from "@/lib/paged-list";
 import { CLIENT_OPTIONS_LIMIT, type ClientOption } from "@/lib/projects/queries";
@@ -218,13 +223,14 @@ export function IncomesBrowser({
             <option value="">כל הלקוחות</option>
             {clientOptions.map((client) => (
               <option key={client.id} value={client.id}>
-                {client.name}
+                {client.archived ? `${client.name} (בארכיון)` : client.name}
               </option>
             ))}
           </select>
           {moreClientsExist ? (
             <p id="incomes-client-hint" className="text-muted-foreground text-sm">
-              מוצגים {CLIENT_OPTIONS_LIMIT} הלקוחות הפעילים הראשונים לפי שם.
+              מוצגים עד {CLIENT_OPTIONS_LIMIT} לקוחות פעילים ועד {ARCHIVED_FILTER_CLIENTS_LIMIT}{" "}
+              לקוחות בארכיון שיש להם הכנסות, לפי שם.
             </p>
           ) : null}
         </div>

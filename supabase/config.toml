@@ -72,7 +72,15 @@ secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 [realtime]
 enabled = false
 
+# M2.2 (DOC-2): Storage holds receipt PDFs in the private "receipts" bucket, created by the
+# migration 20261121090000_documents.sql (so staging and production get it too). Only the
+# Storage API itself is enabled; image transformations (imgproxy) are not needed.
 [storage]
+enabled = true
+# The largest upload Storage accepts at all; the receipts bucket has its own 10MB limit.
+file_size_limit = "10MiB"
+
+[storage.image_transformation]
 enabled = false
 
 [edge_runtime]

@@ -4,6 +4,7 @@ import { todayInJerusalem } from "../../src/lib/dates";
 
 import { createServiceRoleClient, expect, test_ } from "./support/data-fixtures";
 import {
+  MIN_TOUCH_TARGET,
   VIEWPORT_WIDTHS_BY_PROJECT,
   clickThreeTimesSynchronously,
   failServerActions,
@@ -575,6 +576,35 @@ test_.describe("INC-1 / INC-2: the income form", () => {
 
 test_.describe("INC-1: the incomes list", () => {
   test_(
+    "INC-1: an archived client with incomes can be chosen in the client filter",
+    async ({ page, token, seedClient, seedIncome }) => {
+      const archivedId = await seedClient({ name: `בארכיון ${token}` });
+      await seedIncome({ client_id: archivedId, received_date: "1906-09-09", amount: 909 });
+      await createServiceRoleClient()
+        .from("clients")
+        .update({ archived_at: new Date().toISOString() })
+        .eq("id", archivedId);
+      const withoutIncomes = await seedClient({
+        name: `ריק בארכיון ${token}`,
+        archived_at: new Date().toISOString(),
+      });
+      await gotoIncomesList(page);
+
+      const filter = page.getByLabel("לקוח");
+      await expect(filter.locator(`option[value="${withoutIncomes}"]`)).toHaveCount(0);
+      await filter.selectOption({ label: `בארכיון ${token} (בארכיון)` });
+      await chooseMonth(page, "1906-09");
+
+      const list = page.getByRole("list", { name: "רשימת ההכנסות" });
+      await expect(
+        page.getByText(`סה״כ הכנסות ב-09/1906, לקוח: בארכיון ${token}`, { exact: true }),
+      ).toBeVisible();
+      await expect(list.getByRole("listitem")).toHaveCount(1);
+      await expect(list).toContainText(shekels(909));
+    },
+  );
+
+  test_(
     "INC-1: the filters and the form's linked selects are disabled until the page is interactive",
     async ({ page, token, seedClient }) => {
       // The form is shown only when a client exists.
@@ -730,6 +760,14 @@ test_.describe("PRJ-3 / CLI-4 / MS-6: balances on the cards and in open debts", 
       const withoutMilestone = page.getByRole("region", { name: "הכנסות ללא אבן דרך" });
       await expect(withoutMilestone.getByRole("listitem")).toHaveCount(1);
       await expect(withoutMilestone).toContainText("צ'ק");
+      // The payments' edit links, under a milestone and without one, are 44×44 touch targets.
+      const editLinks = page.getByRole("link", { name: /^עריכת (תשלום|הכנסה) מ-/ });
+      await expect(editLinks).toHaveCount(2);
+      for (const link of await editLinks.all()) {
+        const box = (await link.boundingBox())!;
+        expect(box.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+        expect(box.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+      }
 
       await page.goto(`/clients/${clientId}`);
       const payments = page.getByRole("region", { name: "תשלומים" });

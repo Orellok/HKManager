@@ -9,6 +9,7 @@ import {
   getClientPaymentSummary,
   getIncomesMonthSummary,
   getProjectPaidTotal,
+  listArchivedClientsWithIncomes,
   listIncomeChoices,
   listIncomes,
   saveIncome,
@@ -917,6 +918,36 @@ describe("INC-1: income form choices", () => {
     expect(choices.projects[0].milestones.map((milestone) => milestone.description)).toEqual(
       Array.from({ length: 100 }, (_, index) => `אבן ${index}`),
     );
+  });
+});
+
+describe("INC-1: archived clients in the incomes list filter", () => {
+  it("INC-1: lists archived clients with an income that is not deleted, and only those", async () => {
+    const archivedAt = "2026-11-10T10:00:00Z";
+    const withIncome = await insertClient();
+    const onlyDeleted = await insertClient();
+    const withoutIncome = await insertClient();
+    const active = await insertClient();
+    await insertIncome(owner.client, { client_id: withIncome.id });
+    await insertIncome(owner.client, { client_id: withIncome.id });
+    const { data: deleted } = await insertIncome(owner.client, { client_id: onlyDeleted.id });
+    await softDeleteIncome(owner.client, deleted!.id);
+    await insertIncome(owner.client, { client_id: active.id });
+    await service
+      .from("clients")
+      .update({ archived_at: archivedAt })
+      .in("id", [withIncome.id, onlyDeleted.id, withoutIncome.id]);
+
+    const { options } = await listArchivedClientsWithIncomes(owner.client);
+    const ids = options.map((option) => option.id);
+
+    expect(options.filter((option) => option.id === withIncome.id)).toEqual([
+      { id: withIncome.id, name: withIncome.name, archived: true },
+    ]);
+    expect(ids).not.toContain(onlyDeleted.id);
+    expect(ids).not.toContain(withoutIncome.id);
+    expect(ids).not.toContain(active.id);
+    expect((await listArchivedClientsWithIncomes(outsider.client)).options).toEqual([]);
   });
 });
 

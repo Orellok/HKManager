@@ -11,7 +11,16 @@ export type ServerFormState<Field extends string> = {
   values: Record<Field, string>;
   fieldErrors: FieldErrors<Field>;
   formError: string | null;
+  /** The server held the save back until the user confirms it (e.g. MS-5 overpayment). */
+  confirmation?: SaveConfirmation;
 };
+
+/**
+ * A save that needs explicit confirmation: `message` explains why, and submitting the form
+ * again with the confirm button, whose value is `token`, confirms. The server decides
+ * whether the token still matches what it would save.
+ */
+export type SaveConfirmation = { message: string; token: string };
 
 export type FieldErrors<Field extends string> = Partial<Record<Field, string>>;
 

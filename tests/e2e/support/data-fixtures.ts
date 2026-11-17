@@ -32,12 +32,24 @@ export type SeedMilestone = {
   cancelled_at?: string;
 };
 
+export type SeedIncome = {
+  client_id: string;
+  project_id?: string;
+  milestone_id?: string;
+  received_date: string;
+  /** Agorot. */
+  amount: number;
+  payment_method?: "bank_transfer" | "bit_paybox" | "cash" | "check" | "credit_card" | "other";
+  notes?: string;
+};
+
 type DataFixtures = {
   token: string;
   seedClient: (client: SeedClient) => Promise<string>;
   seedProject: (project: SeedProject) => Promise<string>;
   /** Milestones go last in their project's list, in the order they are seeded. */
   seedMilestone: (milestone: SeedMilestone) => Promise<string>;
+  seedIncome: (income: SeedIncome) => Promise<string>;
 };
 
 async function insertRow(table: string, row: object): Promise<string> {
@@ -55,8 +67,9 @@ async function insertRow(table: string, row: object): Promise<string> {
 /**
  * Each test gets a unique token to put inside every client and project name it creates, so
  * parallel tests and leftovers never collide, and cleanup deletes exactly its own rows:
- * milestones of its projects first, then projects (both are ON DELETE RESTRICT), including
- * any project of its clients, then clients.
+ * incomes of its clients and projects first (with their audit log rows), then milestones of
+ * its projects, then projects (all are ON DELETE RESTRICT), including any project of its
+ * clients, then clients. Users cannot delete incomes; the service role can.
  */
 export const test_ = test.extend<DataFixtures>({
   token: async ({}, provide) => {
@@ -84,6 +97,28 @@ export const test_ = test.extend<DataFixtures>({
       throw new Error("Could not find E2E projects to clean up", { cause: projectsError });
     }
     const projectIds = (projects ?? []).map((project) => project.id as string);
+    const owners = [
+      ...(clientIds.length > 0 ? [`client_id.in.(${clientIds})`] : []),
+      ...(projectIds.length > 0 ? [`project_id.in.(${projectIds})`] : []),
+    ];
+    if (owners.length > 0) {
+      const { data: incomes, error: incomesError } = await service
+        .from("incomes")
+        .select("id")
+        .or(owners.join(","));
+      if (incomesError) {
+        throw new Error("Could not find E2E incomes to clean up", { cause: incomesError });
+      }
+      const incomeIds = (incomes ?? []).map((income) => income.id as string);
+      if (incomeIds.length > 0) {
+        const audit = await service.from("audit_log").delete().in("entity_id", incomeIds);
+        const removed = await service.from("incomes").delete().in("id", incomeIds);
+        const incomeError = audit.error ?? removed.error;
+        if (incomeError) {
+          throw new Error("Could not clean up E2E incomes", { cause: incomeError });
+        }
+      }
+    }
     const milestones =
       projectIds.length > 0
         ? await service.from("milestones").delete().in("project_id", projectIds)
@@ -106,6 +141,9 @@ export const test_ = test.extend<DataFixtures>({
   },
   seedMilestone: async ({}, provide) => {
     await provide((milestone) => insertRow("milestones", milestone));
+  },
+  seedIncome: async ({}, provide) => {
+    await provide((income) => insertRow("incomes", { payment_method: "cash", ...income }));
   },
 });
 

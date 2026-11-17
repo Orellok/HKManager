@@ -430,6 +430,63 @@ test_.describe("MS-2: cancel, un-cancel and delete (owner decisions)", () => {
   );
 });
 
+test_.describe("M1.3 carry-overs (M2.1 criterion 11)", () => {
+  test_(
+    "MS-2: deleting the last milestone is announced and focus moves to the section heading",
+    async ({ page, token, seedClient, seedProject, seedMilestone }) => {
+      const { projectId } = await seedProjectFor({ token, seedClient, seedProject });
+      const id = await seedMilestone({
+        project_id: projectId,
+        description: `אחרונה ${token}`,
+        amount: 1,
+        due_date: "2099-01-01",
+      });
+      await page.goto(`/projects/${projectId}`);
+
+      await page.getByRole("button", { name: `מחיקה: אחרונה ${token}` }).click();
+      const dialog = page.getByRole("dialog", { name: "למחוק את אבן הדרך לצמיתות?" });
+      await dialog.getByRole("button", { name: "מחיקה לצמיתות" }).click();
+
+      await expect(liveStatus(page)).toHaveText("אבן הדרך נמחקה.");
+      await expect(milestonesRegion(page)).toContainText("אין עדיין אבני דרך לפרויקט.");
+      await expect(milestonesRegion(page).getByRole("heading", { name: "אבני דרך" })).toBeFocused();
+      expect(await readMilestone(id)).toBeNull();
+    },
+  );
+
+  test_(
+    "MS-1: a redirect notice is shown once; it does not come back after an in-page action refreshes the page",
+    async ({ page, token, seedClient, seedProject, seedMilestone }) => {
+      const { projectId } = await seedProjectFor({ token, seedClient, seedProject });
+      await seedMilestone({
+        project_id: projectId,
+        description: `ראשונה ${token}`,
+        amount: 1,
+        due_date: "2099-01-01",
+      });
+      await page.goto(`/projects/${projectId}/milestones/new`);
+      await descriptionField(page).fill(`שנייה ${token}`);
+      await amountField(page).fill("1");
+      await dueDateField(page).fill("2099-01-01");
+      await page.getByRole("button", { name: "שמירת אבן דרך" }).click();
+
+      const notice = page.getByRole("status").filter({ hasText: "אבן הדרך נשמרה." });
+      await expect(notice).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
+
+      // The move's Server Action refreshes the page (revalidatePath).
+      await page.getByRole("button", { name: `למטה: ראשונה ${token}` }).click();
+      await expect(liveStatus(page)).toHaveText(`"ראשונה ${token}" הועברה למקום 2 מתוך 2.`);
+
+      await expect(notice).toHaveCount(0);
+      await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
+      await page.reload();
+      await expect(milestoneItems(page)).toHaveCount(2);
+      await expect(notice).toHaveCount(0);
+    },
+  );
+});
+
 test_.describe("MS-3: milestones total compared with the contract amount", () => {
   for (const [label, contract, expected] of [
     [
@@ -578,14 +635,21 @@ test_.describe("MS-6: open debts", () => {
       const list = page.getByRole("list", { name: "רשימת החובות הפתוחים" });
       const mine = list.getByRole("listitem").filter({ hasText: token });
       // The list is global: debts of tests running at the same time may come first and push
-      // these past the first page, so load pages until both are shown.
+      // these past the first page, so load pages until both are shown. Those tests also add
+      // and remove debts meanwhile, which can shift a row across a page boundary between two
+      // loads; a pass that misses one starts over from a fresh page.
       const loadMore = page.getByRole("button", { name: "הצגת חובות נוספים" });
-      while ((await mine.count()) < 2 && (await loadMore.isVisible())) {
-        const shown = await list.getByRole("listitem").count();
-        await loadMore.click();
-        await expect(list.getByRole("listitem")).not.toHaveCount(shown);
-      }
-      await expect(mine).toHaveCount(2);
+      const showMine = () =>
+        expect(async () => {
+          await page.reload();
+          while ((await mine.count()) < 2 && (await loadMore.isVisible())) {
+            const shown = await list.getByRole("listitem").count();
+            await loadMore.click();
+            await expect(list.getByRole("listitem")).not.toHaveCount(shown, { timeout: 5_000 });
+          }
+          expect(await mine.count()).toBe(2);
+        }).toPass({ timeout: 60_000 });
+      await showMine();
       await expect(mine.nth(0)).toContainText(`ישן ${token}`);
       await expect(mine.nth(0)).toContainText(ddmmyyyy(older));
       await expect(mine.nth(0)).toContainText(
@@ -604,6 +668,9 @@ test_.describe("MS-6: open debts", () => {
         .click();
       await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
       await page.goBack();
+      // Back on the list, only its first page is shown again.
+      await expect(page).toHaveURL(/\/debts$/);
+      await showMine();
       await mine
         .nth(1)
         .getByRole("link", { name: `חייב ${token}` })
@@ -624,7 +691,9 @@ test_.describe("MS-6: open debts", () => {
         project_id: projectId,
         description: `חוב ${String(index + 1).padStart(2, "0")} ${token}`,
         amount: 100,
-        due_date: "1910-01-01",
+        // The earliest date the app accepts: these debts sort first in the global list, so
+        // other tests' debts cannot push them around between the pages.
+        due_date: "1900-01-01",
       }));
       const { error } = await createServiceRoleClient().from("milestones").insert(rows);
       expect(error).toBeNull();

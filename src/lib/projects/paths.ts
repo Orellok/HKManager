@@ -25,7 +25,14 @@ export function editProjectPath(id: string): string {
 
 /** Codes of the one-time confirmations on the projects screens. */
 export type ProjectNotice =
-  "created" | "updated" | "deleted" | "milestone_created" | "milestone_updated";
+  | "created"
+  | "updated"
+  | "deleted"
+  | "milestone_created"
+  | "milestone_updated"
+  | "income_created"
+  | "income_updated"
+  | "income_deleted";
 
 export const PROJECT_NOTICE_MESSAGES: Record<ProjectNotice, string> = {
   created: "הפרויקט נשמר.",
@@ -33,4 +40,7 @@ export const PROJECT_NOTICE_MESSAGES: Record<ProjectNotice, string> = {
   deleted: "הפרויקט נמחק.",
   milestone_created: "אבן הדרך נשמרה.",
   milestone_updated: "השינויים באבן הדרך נשמרו.",
+  income_created: "התשלום נרשם.",
+  income_updated: "השינויים בתשלום נשמרו.",
+  income_deleted: "התשלום נמחק.",
 };

@@ -27,6 +27,8 @@ export const CLIENT_OPTIONS_LIMIT = 500;
 const FOREIGN_KEY_VIOLATION = "23503";
 /** Raised by projects_require_active_client(): the client is archived (owner decision). */
 const CLIENT_ARCHIVED = "HKA01";
+/** Raised by projects_keep_income_clients(): the project's incomes name its client (M2.1). */
+const HAS_INCOMES = "HKI04";
 
 export type ProjectClient = { id: string; name: string; archived_at: string | null };
 
@@ -185,11 +187,14 @@ export async function getClientOption(
 }
 
 /** Why the database refused to save a project for its client. */
-export type ClientRefusal = "client_archived" | "client_missing";
+export type ClientRefusal = "client_archived" | "client_missing" | "client_has_incomes";
 
 function clientRefusal(code: string | undefined): ClientRefusal | null {
   if (code === CLIENT_ARCHIVED) {
     return "client_archived";
+  }
+  if (code === HAS_INCOMES) {
+    return "client_has_incomes";
   }
   return code === FOREIGN_KEY_VIOLATION ? "client_missing" : null;
 }

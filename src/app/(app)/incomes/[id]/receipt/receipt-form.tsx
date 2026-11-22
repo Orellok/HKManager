@@ -155,10 +155,12 @@ export function ReceiptForm({
   }
 
   /**
-   * The save did not record the upload (errors, or a failed request): remove it, best effort.
-   * The server does the same; the storage policy refuses to remove a file ever recorded.
+   * The server answered that it did not save, so the upload was not recorded: remove it,
+   * best effort (the server's own removal may have failed). Never after a failed request:
+   * the save may have reached the server and be committing; the storage policy and the
+   * lock taken by the recording refuse removing a recorded file in any case.
    */
-  function removeUnsavedUpload(formData: FormData) {
+  function removeRejectedUpload(formData: FormData) {
     const path = formData.get(FILE_PATH_FIELD);
     if (typeof path !== "string" || path === "") {
       return;
@@ -180,7 +182,7 @@ export function ReceiptForm({
       validate: validateForToday,
       checkControls,
       beforeSave: uploadChosenFile,
-      afterUnsavedSave: removeUnsavedUpload,
+      afterRejectedSave: removeRejectedUpload,
     },
   );
 

@@ -704,6 +704,51 @@ test_.describe("M2.2-11: failed requests and ended sessions", () => {
   }
 
   test_(
+    "SPEC 6: when the answer to a save that reached the server is lost, the browser keeps the uploaded file",
+    async ({ page, token, seedClient, seedProject, seedMilestone, seedIncome }) => {
+      const seeds = { token, seedClient, seedProject, seedMilestone, seedIncome };
+      const { incomeId } = await seedPayment(seeds);
+      const storageRemovals: string[] = [];
+      page.on("request", (request) => {
+        if (request.method() === "DELETE" && request.url().includes("/storage/v1/object/")) {
+          storageRemovals.push(request.url());
+        }
+      });
+      let actionCalls = 0;
+      await page.route("**/*", async (route) => {
+        const request = route.request();
+        if (request.method() === "POST" && request.headers()["next-action"]) {
+          actionCalls += 1;
+          // The first action prepares the upload; the second saves. The save reaches the
+          // server and runs; only its answer is lost.
+          if (actionCalls === 2) {
+            await route.fetch();
+            await route.abort("internetdisconnected");
+            return;
+          }
+        }
+        await route.continue();
+      });
+      await gotoReceipt(page, incomeId);
+      await field.number(page).fill(receiptNumber(seeds.token));
+      await field.file(page).setInputFiles({
+        name: "r.pdf",
+        mimeType: "application/pdf",
+        buffer: pdf(),
+      });
+
+      await page.getByRole("button", { name: "שמירת הקבלה" }).click();
+
+      await expect(page.getByRole("alert").first()).toHaveText(SAVE_UNAVAILABLE);
+      await page.waitForLoadState("networkidle");
+      const document = await documentOf(incomeId);
+      expect(document?.file_path).toBeTruthy();
+      expect(await storedFiles(incomeId)).toEqual([document!.file_path!.split("/")[1]]);
+      expect(storageRemovals).toEqual([]);
+    },
+  );
+
+  test_(
     "DOC-2: a failed upload to storage shows an inline error and records nothing",
     async ({ page, token, seedClient, seedProject, seedMilestone, seedIncome }) => {
       const seeds = { token, seedClient, seedProject, seedMilestone, seedIncome };

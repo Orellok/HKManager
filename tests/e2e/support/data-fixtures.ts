@@ -102,6 +102,17 @@ async function removeReceipts(incomeIds: readonly string[]): Promise<string[]> {
       throw new Error("Could not clean up E2E receipt files", { cause: storageError });
     }
   }
+  const documentIds = (documents ?? []).map((document) => document.id as string);
+  if (documentIds.length > 0) {
+    // Kept with ON DELETE RESTRICT, so they go first.
+    const { error: recordedError } = await service
+      .from("recorded_receipt_files")
+      .delete()
+      .in("document_id", documentIds);
+    if (recordedError) {
+      throw new Error("Could not clean up E2E recorded receipt files", { cause: recordedError });
+    }
+  }
   const { error: deleteError } = await service
     .from("documents")
     .delete()
@@ -109,7 +120,7 @@ async function removeReceipts(incomeIds: readonly string[]): Promise<string[]> {
   if (deleteError) {
     throw new Error("Could not clean up E2E receipts", { cause: deleteError });
   }
-  return (documents ?? []).map((document) => document.id as string);
+  return documentIds;
 }
 
 /**

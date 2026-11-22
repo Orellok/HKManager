@@ -40,10 +40,10 @@ type UseServerFormOptions<Field extends string> = {
   /** Runs after validation and before the action, inside the same guarded save. */
   beforeSave?: (formData: FormData) => Promise<BeforeSaveResult<Field>>;
   /**
-   * Runs when the action did not save: it answered with errors, or the request failed. Not
-   * called after a successful save (the action redirects) or an ended session.
+   * Runs when the action answered that it did not save (errors). Never after a failed
+   * request: the server may have saved and only the answer was lost.
    */
-  afterUnsavedSave?: (formData: FormData) => void;
+  afterRejectedSave?: (formData: FormData) => void;
 };
 
 function focusField(form: HTMLFormElement | null, field: string | undefined) {
@@ -67,7 +67,7 @@ export function useServerForm<Field extends string>({
   validate,
   checkControls,
   beforeSave,
-  afterUnsavedSave,
+  afterRejectedSave,
 }: UseServerFormOptions<Field>) {
   // Without JavaScript (or before hydration) the form posts to the Server Action itself and
   // this state holds its answer. With JavaScript, handleSubmit validates in the browser and
@@ -139,10 +139,8 @@ export function useServerForm<Field extends string>({
       }
       // On success the action redirects; it returns only with errors.
       const result = await callServerAction(() => action(state, formData));
-      if (result.status !== "redirected") {
-        afterUnsavedSave?.(formData);
-      }
       if (result.status === "done") {
+        afterRejectedSave?.(formData);
         setBrowserState(result.value);
       } else if (result.status === "failed") {
         // Nothing was saved. The fields were never reset, so the input is still in the form.

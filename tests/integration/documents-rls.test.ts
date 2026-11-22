@@ -364,6 +364,38 @@ for (const role of ["owner", "admin"] as const) {
       expect(await objectExists(path)).toBe(true);
     });
 
+    it(`SPEC 6: ${role} cannot remove a receipt file that was replaced by another file or a link`, async () => {
+      const income = await insertIncome();
+      const first = await upload(user().client, income.id);
+      await recordReceipt(user().client, income.id, fileReceipt(first));
+      const second = await upload(user().client, income.id);
+      const receipt = fileReceipt(second);
+      expect(await updateReceipt(user().client, income.id, receipt)).toEqual({ status: "saved" });
+      expect(
+        await updateReceipt(user().client, income.id, {
+          ...receipt,
+          file_path: null,
+          url: "https://provider.example/receipts/2",
+        }),
+      ).toEqual({ status: "saved" });
+
+      const removed = await user().client.storage.from(RECEIPTS_BUCKET).remove([first, second]);
+
+      expect(removed.data ?? []).toEqual([]);
+      expect(await objectExists(first)).toBe(true);
+      expect(await objectExists(second)).toBe(true);
+    });
+
+    it(`SPEC 6: ${role} cannot read or write the list of recorded receipt files`, async () => {
+      const select = await user().client.from("recorded_receipt_files").select();
+      const insert = await user()
+        .client.from("recorded_receipt_files")
+        .insert({ path: `${randomUUID()}/${randomUUID()}.pdf`, document_id: randomUUID() });
+
+      expect(select.error?.code).toBe(INSUFFICIENT_PRIVILEGE);
+      expect(insert.error?.code).toBe(INSUFFICIENT_PRIVILEGE);
+    });
+
     it(`DOC-2: ${role} can remove an upload that was never recorded`, async () => {
       const income = await insertIncome();
       const path = await upload(user().client, income.id);
@@ -727,6 +759,23 @@ describe("app_settings (DOC-4, owner decision: seed values, admin-only writes)",
     expect(insert.error?.code).toBe(INSUFFICIENT_PRIVILEGE);
     expect(remove.data).toEqual([]);
     expect((await getReceiptSettings(owner.client)).monthlyQuota).toBe(10);
+  });
+
+  it("DOC-4: a receipt recorded while the provider setting is missing gets the default SUMIT", async () => {
+    const income = await insertIncome();
+    const { data: saved } = await service
+      .from("app_settings")
+      .delete()
+      .eq("key", "receipt_provider_name")
+      .select("key, value")
+      .single();
+    try {
+      await recordReceipt(owner.client, income.id, linkReceipt());
+    } finally {
+      await service.from("app_settings").insert(saved!);
+    }
+
+    expect((await readDocument(income.id))?.provider).toBe("SUMIT");
   });
 
   it("AUTH-5: an admin can change a setting (restored afterwards)", async () => {

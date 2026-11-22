@@ -220,6 +220,11 @@ afterAll(async () => {
         .from("audit_log")
         .delete()
         .in("entity_id", [...incomeIds, ...documentIds]);
+      const recorded =
+        documentIds.length > 0
+          ? await service.from("recorded_receipt_files").delete().in("document_id", documentIds)
+          : { error: null };
+      cleanupErrors.push(...[recorded.error].filter(Boolean));
       const removedDocuments = await service.from(TABLE).delete().in("income_id", incomeIds);
       const removedIncomes = await service.from("incomes").delete().in("id", incomeIds);
       cleanupErrors.push(
@@ -667,6 +672,71 @@ describe("INC-4: an income with a receipt is locked", () => {
 
     expect(await remove).toEqual({ ok: true });
     expect(await record).toMatchObject({ ok: false, sqlState: "HKD02" });
+  });
+});
+
+describe("SPEC 6: recording a receipt and removing its file cannot race", () => {
+  it("SPEC 6: a removal during an uncommitted recording waits for it and is then refused; the file stays", async () => {
+    const income = await insertIncome();
+    const path = await upload(owner.client, income.id);
+
+    const record = runPsqlSession(`
+      begin;
+      insert into public.documents (income_id, doc_number, issued_date, file_path)
+      values ('${income.id}', '${uniqueNumber()}', '${todayInJerusalem()}', '${path}');
+      select pg_sleep(1.5);
+      commit;
+    `);
+    await sleep(500);
+    const started = Date.now();
+    const removed = await owner.client.storage.from(RECEIPTS_BUCKET).remove([path]);
+
+    expect(await record).toEqual({ ok: true });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(500);
+    expect(removed.data ?? []).toEqual([]);
+    expect(await objectExists(path)).toBe(true);
+    expect((await readDocument(income.id))?.file_path).toBe(path);
+  });
+
+  it("DOC-2: a removal during a recording that rolls back goes ahead after it", async () => {
+    const income = await insertIncome();
+    const path = await upload(owner.client, income.id);
+
+    const record = runPsqlSession(`
+      begin;
+      insert into public.documents (income_id, doc_number, issued_date, file_path)
+      values ('${income.id}', '${uniqueNumber()}', '${todayInJerusalem()}', '${path}');
+      select pg_sleep(1.5);
+      rollback;
+    `);
+    await sleep(500);
+    const removed = await owner.client.storage.from(RECEIPTS_BUCKET).remove([path]);
+
+    expect(await record).toEqual({ ok: true });
+    expect(removed.error).toBeNull();
+    expect(await objectExists(path)).toBe(false);
+  });
+
+  it("SPEC 6: only allowlisted users learn whether a file was recorded", async () => {
+    const income = await insertIncome();
+    const path = await upload(owner.client, income.id);
+    await recordReceipt(owner.client, income.id, fileReceipt(path));
+
+    const asOwner = await owner.client.rpc("receipt_file_was_recorded", { p_path: path });
+    const asOutsider = await outsider.client.rpc("receipt_file_was_recorded", { p_path: path });
+
+    expect(asOwner.data).toBe(true);
+    expect(asOutsider.data).toBe(false);
+  });
+
+  it("SPEC 6: a document with recorded files cannot lose them by a delete, even by the service role", async () => {
+    const income = await insertIncome();
+    const path = await upload(owner.client, income.id);
+    await recordReceipt(owner.client, income.id, fileReceipt(path));
+
+    const removed = await service.from(TABLE).delete().eq("income_id", income.id);
+
+    expect(removed.error?.code).toBe("23503");
   });
 });
 

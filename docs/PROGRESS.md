@@ -33,7 +33,7 @@ Commit and push after every meaningful step.
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 ## PAUSED (owner request, 2026-11-20)
-Owner asked to stop all work and scheduling until they say to resume. Scheduled task trig_01XMBwEttSgz3DZrj77xVzkR is DISABLED (not deleted). Do not resume any agent or start work until the owner says so.
+Owner asked to stop all work and scheduling until they say to resume. Scheduled task trig_01XMBwEttSgz3DZrj77xVzkR is DISABLED (not deleted). Do not resume any agent or start work until the owner says so. Owner asked for token-saving mode (no 'caveman' skill installed) – rule added to CLAUDE.md.
 On resume: re-enable the scheduled task only if the owner wants it; resume the M2.2 developer (verify the 3 commits, finish remaining work, run all checks, report), then review → QA → PR. Pending owner items: confirm M2.1 round-3 copy; merge Orellok/HKManager#6.
 
 ## Next step

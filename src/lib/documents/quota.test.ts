@@ -47,7 +47,11 @@ describe("quotaWarning", () => {
   it("DOC-4: at and over the quota the warning says so and that recording continues", () => {
     expect(quotaWarning(10, 10)).toContain("נוצלה במלואה");
     expect(quotaWarning(10, 10)).toContain("אפשר להמשיך לתעד קבלות");
-    expect(quotaWarning(12, 10)).toContain("הופקו 2 קבלות מעבר למכסה");
+    expect(quotaWarning(12, 10)).toContain("החודש הופקו 2 קבלות מעבר למכסה");
+  });
+
+  it("DOC-4: one receipt over the quota is worded in the singular", () => {
+    expect(quotaWarning(11, 10)).toContain("החודש הופקה קבלה אחת מעבר למכסה");
   });
 
   it("DOC-4: the counter text", () => {

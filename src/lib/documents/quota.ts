@@ -37,7 +37,10 @@ export function quotaWarning(issued: number, quota: number): string | null {
       return `נוצלו ${Math.floor((issued * 100) / quota)}% מהמכסה החודשית של ספק הקבלות.`;
     case "reached":
       return "המכסה החודשית של ספק הקבלות נוצלה במלואה. אפשר להמשיך לתעד קבלות, וכדאי לבדוק את תנאי המסלול אצל הספק.";
-    case "over":
-      return `החודש הופקו ${issued - quota} קבלות מעבר למכסה החודשית של ספק הקבלות. אפשר להמשיך לתעד קבלות, וכדאי לבדוק את תנאי המסלול אצל הספק.`;
+    case "over": {
+      const excess = issued - quota;
+      const issuedText = excess === 1 ? "הופקה קבלה אחת" : `הופקו ${excess} קבלות`;
+      return `החודש ${issuedText} מעבר למכסה החודשית של ספק הקבלות. אפשר להמשיך לתעד קבלות, וכדאי לבדוק את תנאי המסלול אצל הספק.`;
+    }
   }
 }

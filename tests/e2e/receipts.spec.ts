@@ -155,11 +155,11 @@ test_.describe("DOC-1: issuing a receipt at the provider", () => {
         await expect(details.getByText(text, { exact: true })).toBeVisible();
       }
 
-      await details.getByRole("button", { name: "העתקת שם הלקוח" }).click();
+      await details.getByRole("button", { name: "העתקה שם הלקוח" }).click();
       await expect(details.getByRole("status")).toHaveText("הועתק: שם הלקוח.");
       expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(clientName);
 
-      await details.getByRole("button", { name: "העתקת סכום" }).click();
+      await details.getByRole("button", { name: "העתקה סכום" }).click();
       await expect(details.getByRole("status")).toHaveText("הועתק: סכום.");
       expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("12500.50");
 
@@ -167,7 +167,7 @@ test_.describe("DOC-1: issuing a receipt at the provider", () => {
       await expect(provider).toHaveAttribute("href", "https://app.sumit.co.il/");
       await expect(provider).toHaveAttribute("target", "_blank");
       await expect(provider).toHaveAttribute("rel", "noopener noreferrer");
-      const box = await details.getByRole("button", { name: "העתקת שם הלקוח" }).boundingBox();
+      const box = await details.getByRole("button", { name: "העתקה שם הלקוח" }).boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
     },
   );
@@ -185,7 +185,7 @@ test_.describe("DOC-1: issuing a receipt at the provider", () => {
       await gotoReceipt(page, incomeId);
       const details = page.getByRole("region", { name: "פרטי העסקה" });
 
-      await details.getByRole("button", { name: "העתקת שם הלקוח" }).click();
+      await details.getByRole("button", { name: "העתקה שם הלקוח" }).click();
 
       const manual = details.getByRole("textbox", { name: "שם הלקוח להעתקה ידנית" });
       await expect(manual).toBeFocused();

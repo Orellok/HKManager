@@ -154,6 +154,23 @@ export function ReceiptForm({
     return { status: "ready" };
   }
 
+  /**
+   * The save did not record the upload (errors, or a failed request): remove it, best effort.
+   * The server does the same; the storage policy refuses to remove a file ever recorded.
+   */
+  function removeUnsavedUpload(formData: FormData) {
+    const path = formData.get(FILE_PATH_FIELD);
+    if (typeof path !== "string" || path === "") {
+      return;
+    }
+    createSupabaseBrowserClient()
+      .storage.from(RECEIPTS_BUCKET)
+      .remove([path])
+      .catch(() => {
+        // Nothing to do: an upload left behind is unreferenced and harmless.
+      });
+  }
+
   const { formRef, formAction, handleSubmit, values, errors, formMessage, pending } = useServerForm(
     {
       action,
@@ -163,6 +180,7 @@ export function ReceiptForm({
       validate: validateForToday,
       checkControls,
       beforeSave: uploadChosenFile,
+      afterUnsavedSave: removeUnsavedUpload,
     },
   );
 

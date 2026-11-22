@@ -86,13 +86,9 @@ export function CopyableDetails({ details }: { details: readonly CopyableDetail[
             </dd>
             {detail.copyValue !== null ? (
               <dd>
-                <Button
-                  variant="secondary"
-                  onClick={() => copy(detail)}
-                  disabled={!hydrated}
-                  aria-label={`העתקת ${detail.label}`}
-                >
-                  העתקה
+                <Button variant="secondary" onClick={() => copy(detail)} disabled={!hydrated}>
+                  {/* WCAG 2.5.3: the accessible name starts with the visible text. */}
+                  העתקה<span className="sr-only"> {detail.label}</span>
                 </Button>
               </dd>
             ) : null}

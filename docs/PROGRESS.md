@@ -32,9 +32,7 @@ Commit and push after every meaningful step.
 | M2.2 Receipts (manual) | in implementation – commits b9c495f, f430281, c264e4d pushed; dev stopped by weekly usage limit before reporting (checks/report not confirmed) | docs/specs/m2-2-receipts.md | docs/specs/m2-1-incomes.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
-## PAUSED (owner request, 2026-11-20)
-Owner asked to stop all work and scheduling until they say to resume. Scheduled task trig_01XMBwEttSgz3DZrj77xVzkR is DISABLED (not deleted). Do not resume any agent or start work until the owner says so. Owner asked for token-saving mode (no 'caveman' skill installed) – rule added to CLAUDE.md.
-On resume: re-enable the scheduled task only if the owner wants it; resume the M2.2 developer (verify the 3 commits, finish remaining work, run all checks, report), then review → QA → PR. Pending owner items: confirm M2.1 round-3 copy; merge Orellok/HKManager#6.
+Resumed by owner 2026-11-22 (scheduled task stays disabled unless owner asks).
 
 ## Next step
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run); (5) Netlify account + 2 sites + NETLIFY_AUTH_TOKEN (docs/setup/netlify.md).

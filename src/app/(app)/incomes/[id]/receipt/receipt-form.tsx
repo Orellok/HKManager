@@ -33,8 +33,8 @@ import {
   type ReceiptFormValues,
   type ReceiptSource,
 } from "@/lib/documents/schema";
+import { removeRejectedUpload, uploadToSignedPath } from "@/lib/files/browser-upload";
 import type { FieldErrors } from "@/lib/forms";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type ReceiptFormProps = {
   action: (state: ReceiptFormState, formData: FormData) => Promise<ReceiptFormState>;
@@ -139,38 +139,21 @@ export function ReceiptForm({
       };
     }
     const { path, token } = call.value;
-    try {
-      const { error } = await createSupabaseBrowserClient()
-        .storage.from(RECEIPTS_BUCKET)
-        // Sent with the PDF type it was checked for, whatever type the system gave the file.
-        .uploadToSignedUrl(path, token, new Blob([file], { type: PDF_MIME_TYPE }));
-      if (error) {
-        return { status: "rejected", formError: UPLOAD_FAILED };
-      }
-    } catch {
+    // Sent with the PDF type it was checked for, whatever type the system gave the file.
+    const pdf = new Blob([file], { type: PDF_MIME_TYPE });
+    if (!(await uploadToSignedPath(RECEIPTS_BUCKET, path, token, pdf))) {
       return { status: "rejected", formError: UPLOAD_FAILED };
     }
     formData.set(FILE_PATH_FIELD, path);
     return { status: "ready" };
   }
 
-  /**
-   * The server answered that it did not save, so the upload was not recorded: remove it,
-   * best effort (the server's own removal may have failed). Never after a failed request:
-   * the save may have reached the server and be committing; the storage policy and the
-   * lock taken by the recording refuse removing a recorded file in any case.
-   */
-  function removeRejectedUpload(formData: FormData) {
+  /** The server answered that it did not save, so the upload was not recorded: remove it. */
+  function removeUploadOfRejectedSave(formData: FormData) {
     const path = formData.get(FILE_PATH_FIELD);
-    if (typeof path !== "string" || path === "") {
-      return;
+    if (typeof path === "string" && path !== "") {
+      removeRejectedUpload(RECEIPTS_BUCKET, path);
     }
-    createSupabaseBrowserClient()
-      .storage.from(RECEIPTS_BUCKET)
-      .remove([path])
-      .catch(() => {
-        // Nothing to do: an upload left behind is unreferenced and harmless.
-      });
   }
 
   const { formRef, formAction, handleSubmit, values, errors, formMessage, pending } = useServerForm(
@@ -182,7 +165,7 @@ export function ReceiptForm({
       validate: validateForToday,
       checkControls,
       beforeSave: uploadChosenFile,
-      afterRejectedSave: removeRejectedUpload,
+      afterRejectedSave: removeUploadOfRejectedSave,
     },
   );
 

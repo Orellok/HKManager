@@ -552,7 +552,7 @@ test_.describe("INC-1 / INC-2: the income form", () => {
       await page.goto(`/projects/${projectId}`);
       const item = milestoneItem(page, `מקדמה ${token}`);
       await expect(item).toContainText(`יתרה: ${shekels(60_000)}`);
-      await item.getByRole("link", { name: /^עריכת תשלום/ }).click();
+      await item.getByRole("link", { name: /^עריכה: תשלום מ-/ }).click();
       await incomeFormReady(page);
 
       await page.getByRole("button", { name: "מחיקת הכנסה" }).click();

@@ -30,6 +30,8 @@ export type ReceiptSource = (typeof RECEIPT_SOURCES)[number];
 export const DOC_NUMBER_MAX_LENGTH = 30;
 export const RECEIPT_URL_MAX_LENGTH = 2000;
 
+/** "-" and "/" are allowed inside a receipt number, but not as its first character. */
+const LEADING_SYMBOL_PATTERN = /^[-/]/;
 /** Mirrors documents_doc_number_check. */
 const DOC_NUMBER_PATTERN = /^[0-9A-Za-z][0-9A-Za-z/-]*$/;
 /** Mirrors documents_url_check: https, a host, then optionally a path, query or fragment. */
@@ -38,6 +40,7 @@ const HTTPS_URL_PATTERN = /^https:\/\/[^/?#\s]+([/?#]\S*)?$/;
 export const RECEIPT_FIELD_MESSAGES = {
   docNumberRequired: "יש להזין את מספר הקבלה.",
   docNumberInvalid: `מספר הקבלה יכול לכלול ספרות, אותיות באנגלית, מקף ולוכסן, עד ${DOC_NUMBER_MAX_LENGTH} תווים.`,
+  docNumberLeadingSymbol: "מספר הקבלה צריך להתחיל בספרה או באות באנגלית, לא במקף או בלוכסן.",
   docNumberTaken: "מספר הקבלה הזה כבר רשום לקבלה אחרת. יש לבדוק את המספר.",
   issuedDateRequired: "יש להזין את תאריך הפקת הקבלה.",
   issuedDateInFuture: "תאריך הפקת הקבלה לא יכול להיות בעתיד.",
@@ -72,7 +75,11 @@ export function receiptInputSchema(today: string) {
         .string()
         .trim()
         .min(1, { error: RECEIPT_FIELD_MESSAGES.docNumberRequired, abort: true })
-        .max(DOC_NUMBER_MAX_LENGTH, { error: RECEIPT_FIELD_MESSAGES.docNumberInvalid })
+        .max(DOC_NUMBER_MAX_LENGTH, { error: RECEIPT_FIELD_MESSAGES.docNumberInvalid, abort: true })
+        .refine((value) => !LEADING_SYMBOL_PATTERN.test(value), {
+          error: RECEIPT_FIELD_MESSAGES.docNumberLeadingSymbol,
+          abort: true,
+        })
         .regex(DOC_NUMBER_PATTERN, { error: RECEIPT_FIELD_MESSAGES.docNumberInvalid }),
       issued_date: requiredDateField(RECEIPT_FIELD_MESSAGES.issuedDateRequired).refine(
         (value) => value <= today,

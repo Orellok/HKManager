@@ -33,7 +33,10 @@ function expectSecurityHeaders(response: APIResponse) {
   expect(headers["x-content-type-options"]).toBe("nosniff");
   expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
   expect(headers["x-frame-options"]).toBe("DENY");
-  expect(headers["permissions-policy"]).toContain("camera=()");
+  // EXP-2 (owner decision M0.1): the camera opens for the app's own pages only, from M3.
+  expect(headers["permissions-policy"]).toBe(
+    "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+  );
 }
 
 /** Records CSP violations from the very first byte of every navigation on this page. */

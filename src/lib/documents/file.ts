@@ -1,3 +1,7 @@
+import { PDF_MIME_TYPE, hasSignature, readFirstBytes } from "@/lib/files/signatures";
+
+export { PDF_MIME_TYPE };
+
 /**
  * DOC-2 / owner decision: a receipt file is a PDF of at most 10MB. The same rules run in the
  * browser (before uploading) and on the server (on the stored object, before recording it);
@@ -10,14 +14,6 @@ export const RECEIPTS_BUCKET = "receipts";
 /** 10MB, as the bucket's file_size_limit (10485760 bytes). */
 export const RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
 
-export const PDF_MIME_TYPE = "application/pdf";
-
-/** Every PDF file starts with "%PDF-". */
-const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46, 0x2d] as const;
-
-/** Bytes to read from the start of a file to check it is a PDF. */
-export const PDF_MAGIC_LENGTH = PDF_MAGIC.length;
-
 export type ReceiptFileError = "empty" | "too_large" | "not_pdf";
 
 export const RECEIPT_FILE_MESSAGES: Record<ReceiptFileError | "required", string> = {
@@ -29,7 +25,7 @@ export const RECEIPT_FILE_MESSAGES: Record<ReceiptFileError | "required", string
 
 /** Whether the first bytes of a file are the PDF signature "%PDF-". */
 export function hasPdfSignature(firstBytes: Uint8Array): boolean {
-  return PDF_MAGIC.every((byte, index) => firstBytes[index] === byte);
+  return hasSignature(PDF_MIME_TYPE, firstBytes);
 }
 
 /** Checks a file's size and declared type; null when both are acceptable. */
@@ -52,6 +48,5 @@ export async function checkReceiptFileContent(file: Blob): Promise<ReceiptFileEr
   if (error) {
     return error;
   }
-  const firstBytes = new Uint8Array(await file.slice(0, PDF_MAGIC_LENGTH).arrayBuffer());
-  return hasPdfSignature(firstBytes) ? null : "not_pdf";
+  return hasPdfSignature(await readFirstBytes(file)) ? null : "not_pdf";
 }

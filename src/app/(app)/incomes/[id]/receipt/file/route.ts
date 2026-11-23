@@ -9,7 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * DOC-2: opens an income's receipt PDF. The file stays in the private bucket; this answers
- * with a redirect to a signed URL that expires after RECEIPT_VIEW_URL_SECONDS, created for
+ * with a redirect to a signed URL that expires after VIEW_URL_SECONDS, created for
  * the signed-in, allowlisted user. The browser navigates to Storage, so the app's CSP needs
  * no change (it governs the app's own pages, not where a link leads). Never cached.
  */

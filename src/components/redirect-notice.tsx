@@ -17,6 +17,11 @@ const ACTION_SELECTOR = "a, button, summary, [role='button']";
 type RedirectNoticeProps = {
   /** The confirmation to show, or undefined for none. */
   message: string | undefined;
+  /**
+   * Kept on screen until the user leaves it, rather than removed at the next action (EXP-7:
+   * "יש לשמור את הקבלה המקורית" must not disappear at the first click).
+   */
+  persistent?: boolean;
 };
 
 /**
@@ -30,12 +35,16 @@ type RedirectNoticeProps = {
  *   asked for the old address and showed the notice again; Back restored it as well.
  * - The message is kept in this component's state, so the re-render of the page without
  *   the parameter does not remove it at once. It is removed at the user's next action (a
- *   click on a link or button, or a form submit), and a reload or Back no longer has it.
+ *   click on a link or button, or a form submit), or, when `persistent`, when the user
+ *   leaves the screen; a reload or Back no longer has it.
  */
-export function RedirectNotice({ message }: RedirectNoticeProps) {
+export function RedirectNotice({ message, persistent = false }: RedirectNoticeProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [shown, setShown] = useState<string | undefined>(undefined);
+  // The persistence travels with the message: the re-render without the parameter has none.
+  const [shown, setShown] = useState<{ text: string; persistent: boolean } | undefined>(
+    undefined,
+  );
   const announceTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -44,7 +53,10 @@ export function RedirectNotice({ message }: RedirectNoticeProps) {
       return;
     }
     window.clearTimeout(announceTimer.current);
-    announceTimer.current = window.setTimeout(() => setShown(message), ANNOUNCE_DELAY_MS);
+    announceTimer.current = window.setTimeout(
+      () => setShown({ text: message, persistent }),
+      ANNOUNCE_DELAY_MS,
+    );
     const params = new URLSearchParams(window.location.search);
     if (params.has(NOTICE_PARAM)) {
       params.delete(NOTICE_PARAM);
@@ -53,12 +65,12 @@ export function RedirectNotice({ message }: RedirectNoticeProps) {
         scroll: false,
       });
     }
-  }, [message, pathname, router]);
+  }, [message, persistent, pathname, router]);
 
   useEffect(() => () => window.clearTimeout(announceTimer.current), []);
 
   useEffect(() => {
-    if (shown === undefined) {
+    if (shown === undefined || shown.persistent) {
       return;
     }
     function dismiss(event: Event) {
@@ -81,7 +93,7 @@ export function RedirectNotice({ message }: RedirectNoticeProps) {
   // none), so the later message is announced; it takes no space in the layout.
   return (
     <p role="status" className="text-sm font-medium empty:sr-only">
-      {shown}
+      {shown?.text}
     </p>
   );
 }

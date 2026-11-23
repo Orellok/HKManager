@@ -25,7 +25,14 @@ export function ChartFrame({
 }) {
   const hydrated = useHydrated();
   return (
-    <div role="img" aria-label={label} dir="ltr" className={cn("w-full", heightClass)}>
+    // overflow-hidden: while the chart catches up with a narrower screen (it re-measures
+    // after a resize), its old width never makes the page scroll sideways.
+    <div
+      role="img"
+      aria-label={label}
+      dir="ltr"
+      className={cn("w-full min-w-0 overflow-hidden", heightClass)}
+    >
       {hydrated ? children : null}
     </div>
   );

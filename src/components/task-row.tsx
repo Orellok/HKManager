@@ -29,7 +29,9 @@ type TaskRowProps = {
   stacked?: boolean;
 };
 
-const PILL_CLASSES = "inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs";
+/** A pill may wrap inside a narrow column (the calendar's week view) rather than overflow it. */
+const PILL_CLASSES =
+  "inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-xs wrap-anywhere";
 
 /**
  * One task: its title (a link to its edit form), due date, priority, client and project, and

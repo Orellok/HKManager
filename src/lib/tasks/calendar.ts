@@ -8,14 +8,15 @@ import {
   isIsoDateInRange,
 } from "@/lib/dates";
 
-import { CALENDAR_PATH } from "./paths";
-
 /**
  * CAL-1 / CAL-9 / CAL-11: the in-app calendar's views and date ranges. Dates are calendar
  * dates (ISO strings) in Asia/Jerusalem; "today" comes from todayInJerusalem(). Weeks start on
  * Sunday (SPEC 8). All arithmetic is on UTC midnights (addDays), so no DST change can shift a
  * day. Only the view code and a date go into the address (SPEC 8).
  */
+
+/** CAL-11: the in-app calendar. */
+export const CALENDAR_PATH = "/calendar";
 
 export const CALENDAR_VIEWS = ["agenda", "day", "week", "month"] as const;
 export type CalendarView = (typeof CALENDAR_VIEWS)[number];
@@ -88,7 +89,7 @@ export function datesBetween(from: string, to: string): string[] {
 
 export type CalendarParams = { view: CalendarView; date: string };
 
-function isCalendarView(value: unknown): value is CalendarView {
+export function isCalendarView(value: unknown): value is CalendarView {
   return typeof value === "string" && (CALENDAR_VIEWS as readonly string[]).includes(value);
 }
 

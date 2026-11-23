@@ -42,9 +42,7 @@ export function RedirectNotice({ message, persistent = false }: RedirectNoticePr
   const router = useRouter();
   const pathname = usePathname();
   // The persistence travels with the message: the re-render without the parameter has none.
-  const [shown, setShown] = useState<{ text: string; persistent: boolean } | undefined>(
-    undefined,
-  );
+  const [shown, setShown] = useState<{ text: string; persistent: boolean } | undefined>(undefined);
   const announceTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {

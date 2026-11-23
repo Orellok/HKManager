@@ -4,7 +4,9 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  cspBlocksHostScripts,
   hasRequiredRobotsDirectives,
+  isHostInjectedScript,
   parseBaseUrl,
   robotsTxtDisallowsAll,
   runSmokeChecks,
@@ -24,7 +26,14 @@ type SiteBehaviour = {
   loginStatus: number;
   cspNonce: (requestNumber: number) => string | null;
   scriptNonce: (requestNumber: number) => string | null;
+  /** script-src sources of the /login CSP for a given nonce. */
+  scriptSources: (nonce: string) => string;
+  /** Extra markup in the /login head, e.g. a script the host injects. */
+  extraHeadHtml: string;
 };
+
+const NETLIFY_HUD_SCRIPT =
+  '<script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public"></script>';
 
 const HEALTHY: SiteBehaviour = {
   robotsTxt: "User-Agent: *\nDisallow: /\n",
@@ -35,6 +44,8 @@ const HEALTHY: SiteBehaviour = {
   loginStatus: 200,
   cspNonce: (n) => `nonce${n}`,
   scriptNonce: (n) => `nonce${n}`,
+  scriptSources: (nonce) => `'self' 'nonce-${nonce}' 'strict-dynamic'`,
+  extraHeadHtml: "",
 };
 
 let server: Server | undefined;
@@ -70,14 +81,14 @@ async function startSite(overrides: Partial<SiteBehaviour> = {}): Promise<URL> {
       if (cspNonce) {
         response.setHeader(
           "Content-Security-Policy",
-          `default-src 'self'; script-src 'self' 'nonce-${cspNonce}' 'strict-dynamic'; style-src 'self' 'nonce-${cspNonce}';`,
+          `default-src 'self'; script-src ${site.scriptSources(cspNonce)}; style-src 'self' 'nonce-${cspNonce}';`,
         );
       }
       const nonceAttribute = scriptNonce ? ` nonce="${scriptNonce}"` : "";
       response
         .writeHead(site.loginStatus, { "Content-Type": "text/html" })
         .end(
-          `<html><head><script src="/a.js"${nonceAttribute} async></script></head>` +
+          `<html><head><script src="/a.js"${nonceAttribute} async></script>${site.extraHeadHtml}</head>` +
             `<body><script${nonceAttribute}>self.x=1</script></body></html>`,
         );
     } else {
@@ -160,6 +171,47 @@ describe("M0.6-4: post-deploy smoke checks", () => {
     expect(results.find((r) => !r.ok)?.detail).toMatch(/2 of 2 <script> tags lack the CSP nonce/);
   });
 
+  it("M0.6-4: warns about, but passes, a Netlify host script the CSP blocks", async () => {
+    const results = await runSmokeChecks(await startSite({ extraHeadHtml: NETLIFY_HUD_SCRIPT }));
+
+    expect(failures(results)).toEqual([]);
+    const login = results.find((r) => r.name.startsWith("/login"));
+    expect(login?.warnings).toHaveLength(1);
+    expect(login?.warnings[0]).toContain("/.netlify/scripts/hud?variant=public");
+  });
+
+  it("M0.6-4: still fails on another script without the nonce next to the host script", async () => {
+    const results = await runSmokeChecks(
+      await startSite({ extraHeadHtml: `${NETLIFY_HUD_SCRIPT}<script src="/evil.js"></script>` }),
+    );
+
+    expect(results.find((r) => !r.ok)?.detail).toMatch(
+      /1 of 4 <script> tags lack the CSP nonce, e\.g\. <script src="\/evil\.js">/,
+    );
+  });
+
+  it("M0.6-4: fails on a host script when the CSP lacks 'strict-dynamic'", async () => {
+    const results = await runSmokeChecks(
+      await startSite({
+        extraHeadHtml: NETLIFY_HUD_SCRIPT,
+        scriptSources: (nonce) => `'self' 'nonce-${nonce}'`,
+      }),
+    );
+
+    expect(results.find((r) => !r.ok)?.detail).toMatch(/CSP may allow a host-injected script/);
+  });
+
+  it("M0.6-4: fails on a host script when the CSP names a Netlify source", async () => {
+    const results = await runSmokeChecks(
+      await startSite({
+        extraHeadHtml: NETLIFY_HUD_SCRIPT,
+        scriptSources: (nonce) => `'nonce-${nonce}' 'strict-dynamic' https://x.netlify.app`,
+      }),
+    );
+
+    expect(results.find((r) => !r.ok)?.detail).toMatch(/CSP may allow a host-injected script/);
+  });
+
   it("M0.6-4: fails when the nonce repeats across requests (cached page)", async () => {
     const results = await runSmokeChecks(
       await startSite({ cspNonce: () => "fixed", scriptNonce: () => "fixed" }),
@@ -224,5 +276,28 @@ describe("M0.6-4: smoke check helpers", () => {
   it("M0.6-4: lists script tags without the nonce", () => {
     const html = '<script nonce="n">a</script><SCRIPT src="/x.js"></SCRIPT><scripts>';
     expect(scriptTagsWithoutNonce(html, "n")).toEqual(['<SCRIPT src="/x.js">']);
+  });
+
+  it("M0.6-4: recognises only same-origin /.netlify/scripts/ paths as host scripts", () => {
+    expect(isHostInjectedScript(NETLIFY_HUD_SCRIPT)).toBe(true);
+    expect(isHostInjectedScript("<script src='/.netlify/scripts/rum'>")).toBe(true);
+    expect(isHostInjectedScript("<SCRIPT async SRC=/.netlify/scripts/hud>")).toBe(true);
+
+    expect(isHostInjectedScript('<script src="//evil/.netlify/scripts/hud">')).toBe(false);
+    expect(isHostInjectedScript('<script src="https://x/.netlify/scripts/hud">')).toBe(false);
+    expect(isHostInjectedScript('<script src="/.netlify/scriptsX/hud">')).toBe(false);
+    expect(isHostInjectedScript('<script src="/.netlify/scripts">')).toBe(false);
+    expect(isHostInjectedScript('<script src="/app/.netlify/scripts/hud">')).toBe(false);
+    expect(isHostInjectedScript("<script>")).toBe(false);
+    expect(isHostInjectedScript('<script data-src="/.netlify/scripts/hud">')).toBe(false);
+    expect(isHostInjectedScript('<script data-x="/.netlify/scripts/" src="/a.js">')).toBe(false);
+  });
+
+  it("M0.6-4: the CSP blocks host scripts only with 'strict-dynamic' and no Netlify source", () => {
+    expect(cspBlocksHostScripts("script-src 'self' 'nonce-a' 'strict-dynamic'")).toBe(true);
+    expect(cspBlocksHostScripts("script-src 'self' 'nonce-a'")).toBe(false);
+    expect(cspBlocksHostScripts("script-src 'nonce-a' 'strict-dynamic' *.netlify.app")).toBe(false);
+    expect(cspBlocksHostScripts("default-src 'strict-dynamic'; script-src 'nonce-a'")).toBe(false);
+    expect(cspBlocksHostScripts(null)).toBe(false);
   });
 });

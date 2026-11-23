@@ -14,3 +14,9 @@ Method: web search. netlify.com and docs.netlify.com are blocked from the cloud 
 1. **Gate:** the first staging deploy must prove that `proxy.ts` runs on Netlify: login redirect, `/unauthorized`, nonce CSP header on pages, prefetch-bypass protection. If it does not, STOP and bring options to the owner (e.g. keep auth in page guards only, or another host) – no workaround without approval.
 2. **Credit budget:** do not deploy staging on every push automatically if each deploy costs credits. Options: deploy staging only on push to `main` (not every branch), or manual; check in the Netlify dashboard what a deploy actually costs after the first one.
 3. Re-check the pricing page in the dashboard when the account is created (owner).
+
+## Netlify HUD script on the published site (found 2026-11-23)
+- The staging smoke check on the **published** site found `<script async src="/.netlify/scripts/hud?variant=public" …>` without our nonce. Netlify injects it into published pages; it is not part of our app.
+- Our nonce CSP (`'strict-dynamic'`, no Netlify source) blocks it in browsers. This is intended; the CSP is not weakened for it.
+- `scripts/smoke-deploy.mts` now reports scripts under the same-origin path `/.netlify/scripts/` as a WARN (not a FAIL), but only while the CSP still has `'strict-dynamic'` and names no Netlify source. Any other script without the nonce still fails.
+- Owner (optional): if the Netlify UI has a setting to turn off this toolbar/HUD for the site, disabling it removes the blocked request and the warning. **Unverified** – whether such a setting exists was not checked (Netlify docs are blocked from the cloud session).

@@ -2,7 +2,8 @@ import type { MonthTotals } from "@/lib/dashboard/queries";
 import { formatMonth } from "@/lib/incomes/month";
 import { formatAgorot } from "@/lib/money";
 
-import { EXPENSE_LABEL, INCOME_LABEL, MonthlyChart } from "./monthly-chart";
+import { EXPENSE_LABEL, INCOME_LABEL } from "./chart-labels";
+import { MonthlyChart } from "./monthly-chart";
 
 /**
  * DASH-3: the 12-month chart, then the same numbers as a table (the chart's text

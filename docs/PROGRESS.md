@@ -18,6 +18,7 @@ Commit and push after every meaningful step.
 - 2026-11-16: owner approved M1.3 deviations/copy (100 milestones/project, no warning with 0 milestones, past-due amount-0 = מתוכנן, 'חזרה') and M2 plan (split M2.1/M2.2, income amount > 0, no future received date, no payments for cancelled milestones, 'הכנסות' as 5th nav item).
 - 2026-11-16: owner approved M2.1 deviations and copy (past-due partially paid = לתשלום; payments allowed for archived clients/projects; single-month incomes list; HKI04; balance definitions).
 - 2026-11-22: owner approved M2.2 deviations and copy (file OR link; receipt-number format; issue date not future; replaced files kept; pending tab across months; direct signed upload).
+- 2026-11-23: owner removed the code-reviewer step: dev → QA → dev fix, max 2 fix rounds (recorded in CLAUDE.md).
 - Owner wants work committed continuously and resumed autonomously after interruptions.
 
 ## Status

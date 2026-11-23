@@ -440,7 +440,9 @@ test_.describe("M1.1-8: navigation", () => {
         .getByRole("link")
         .evaluateAll((links) => links.map((link) => getComputedStyle(link).fontWeight));
       expect(weights).toEqual(
-        isMobile ? ["400", "700", "400", "400"] : ["400", "700", "400", "400", "400", "400", "400"],
+        isMobile
+          ? ["400", "700", "400", "400"]
+          : ["400", "700", "400", "400", "400", "400", "400", "400"],
       );
     },
   );

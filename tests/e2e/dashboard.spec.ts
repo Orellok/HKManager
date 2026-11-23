@@ -76,6 +76,43 @@ function ceilingRegion(page: Page, year: number) {
 
 test_.describe("DASH-1..5: the dashboard", () => {
   test_(
+    "DASH-1 (M4.1 carry-over): the period field follows the previous/next links and the type switch, without console warnings",
+    async ({ page, signIn }) => {
+      await signIn({ role: "owner" });
+      const messages: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "warning" || message.type() === "error") {
+          messages.push(message.text());
+        }
+      });
+      await page.goto(monthUrl("2000-03"));
+      const month = page.getByLabel("חודש", { exact: true });
+      await expect(month).toHaveValue("2000-03");
+      await page.waitForLoadState("networkidle");
+
+      await page.getByRole("link", { name: "החודש הקודם: 02/2000" }).click();
+      await expect(page).toHaveURL(/month=2000-02/);
+      await expect(month).toHaveValue("2000-02");
+      await page.getByRole("link", { name: "החודש הבא: 03/2000" }).click();
+      await expect(month).toHaveValue("2000-03");
+
+      // A value typed but not submitted gives way to the period a link opens.
+      await month.fill("2000-07");
+      await page.getByRole("link", { name: "החודש הקודם: 02/2000" }).click();
+      await expect(month).toHaveValue("2000-02");
+
+      await page.getByRole("link", { name: "שנה", exact: true }).click();
+      const year = page.getByLabel("שנה", { exact: true });
+      await expect(year).toHaveValue("2000");
+      await page.getByRole("link", { name: "השנה הקודמת: 1999" }).click();
+      await expect(year).toHaveValue("1999");
+      await page.getByRole("link", { name: "חודש", exact: true }).click();
+      await expect(month).toHaveValue("1999-12");
+      expect(messages).toEqual([]);
+    },
+  );
+
+  test_(
     "DASH-1 / DASH-2: opens on the current month and switches between months and years with exact totals and comparisons",
     async ({ page, signIn, token, seedClient, seedExpense, seedCategory }, testInfo) => {
       await signIn({ role: "owner" });
@@ -320,7 +357,10 @@ test_.describe("CEIL-3..6: the exempt-dealer ceiling", () => {
           `התראה: המחזור בשנת ${year} עבר 70% מתקרת עוסק פטור (70.0%)`,
         );
         await thresholdBanner.getByRole("button", { name: "קראתי, אפשר להסתיר" }).click();
-        await expect(page.getByRole("status").filter({ hasText: "ההתראה אושרה" })).toBeVisible();
+        // M4.1 carry-over: the confirmation says what the acknowledgement covers.
+        await expect(page.getByRole("status")).toHaveText(
+          `ההתראה אושרה: התראת 70% לא תוצג שוב בשנת ${year}. התראה חדשה תוצג אם המחזור יעבור 85% מהתקרה.`,
+        );
         await expect(thresholdBanner).toHaveCount(0);
         await expect(page.getByRole("heading", { name: `תקרת עוסק פטור – ${year}` })).toBeFocused();
         await page.reload();
@@ -397,6 +437,46 @@ test_.describe("CEIL-3..6: the exempt-dealer ceiling", () => {
         await expect(page.getByRole("status")).toContainText("הפעולה לא בוצעה");
         await expect(banner).toBeVisible();
         await restore();
+      } finally {
+        await clearCeilingYears([year]);
+      }
+    },
+  );
+
+  test_(
+    "CEIL-4 (M4.1 carry-over): a threshold the turnover no longer reaches is not acknowledged, and the banner goes",
+    async ({ page, signIn, token, seedClient, seedIncome }, testInfo) => {
+      const year = testYear(testInfo, 9);
+      await clearCeilingYears([year]);
+      try {
+        await signIn({ role: "owner" });
+        await setCeiling(year, 1_000);
+        const clientId = await seedClient({ name: `ירידה ${token}` });
+        const incomeId = await seedIncome({
+          client_id: clientId,
+          received_date: `${year}-03-03`,
+          amount: 800,
+        });
+        await page.goto(yearUrl(year));
+        const banner = page.getByRole("region", { name: /^התראה: המחזור בשנת \d+ עבר 70%/ });
+        await expect(banner).toBeVisible();
+        await page.waitForLoadState("networkidle");
+        // The income is deleted elsewhere while the banner is on screen.
+        const { error } = await createServiceRoleClient()
+          .from("incomes")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", incomeId);
+        expect(error).toBeNull();
+        await banner.getByRole("button", { name: "קראתי, אפשר להסתיר" }).click();
+        await expect(page.getByRole("status")).toHaveText(
+          `ההתראה לא אושרה: המחזור בשנת ${year} לא הגיע ל-70% מהתקרה. הנתונים בדף עודכנו.`,
+        );
+        await expect(banner).toHaveCount(0);
+        const { data: acks } = await createServiceRoleClient()
+          .from("ceiling_alert_acks")
+          .select("threshold")
+          .eq("year", year);
+        expect(acks).toEqual([]);
       } finally {
         await clearCeilingYears([year]);
       }

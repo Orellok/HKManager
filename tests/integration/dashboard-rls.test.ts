@@ -82,8 +82,18 @@ async function setBasis(basis: unknown) {
 }
 
 async function clearCeilingYear() {
-  await service.from("ceiling_alert_acks").delete().in("year", [CEILING_YEAR, YEAR]);
-  await service.from("tax_year_settings").delete().in("year", [CEILING_YEAR, YEAR]);
+  const years = [CEILING_YEAR, YEAR, NEXT_YEAR];
+  await service.from("ceiling_alert_acks").delete().in("year", years);
+  await service.from("tax_year_settings").delete().in("year", years);
+}
+
+async function setCeiling(year: number, exemptCeiling: number) {
+  const { error } = await service
+    .from("tax_year_settings")
+    .insert({ year, exempt_ceiling: exemptCeiling });
+  if (error) {
+    throw new Error("Could not set a test ceiling", { cause: error });
+  }
 }
 
 beforeAll(async () => {
@@ -255,16 +265,19 @@ describe("CEIL-1: tax_year_settings RLS", () => {
 });
 
 describe("CEIL-4: ceiling_alert_acks", () => {
+  // YEAR's turnover (10,000,050,100 agorot) is above the largest ceiling: every threshold is
+  // crossed. NEXT_YEAR's (70,000) is 77.7% of 90,000: only 70% is crossed.
   it("CEIL-4: an acknowledgement is stored once per year and threshold, by the database's user and time", async () => {
     await clearCeilingYear();
-    await acknowledgeCeilingAlert(owner.client, CEILING_YEAR, 85);
+    await setCeiling(YEAR, 9_999_999_999);
+    expect(await acknowledgeCeilingAlert(owner.client, YEAR, 85)).toBe("acknowledged");
     // Again, by the other user: no error, the first acknowledgement stays.
-    await acknowledgeCeilingAlert(admin.client, CEILING_YEAR, 85);
-    await acknowledgeCeilingAlert(admin.client, CEILING_YEAR, 95);
+    expect(await acknowledgeCeilingAlert(admin.client, YEAR, 85)).toBe("acknowledged");
+    expect(await acknowledgeCeilingAlert(admin.client, YEAR, 95)).toBe("acknowledged");
     const { data } = await service
       .from("ceiling_alert_acks")
       .select("threshold, acked_by")
-      .eq("year", CEILING_YEAR)
+      .eq("year", YEAR)
       .order("threshold");
     expect(data).toEqual([
       { threshold: 70, acked_by: owner.id },
@@ -276,7 +289,7 @@ describe("CEIL-4: ceiling_alert_acks", () => {
   it("CEIL-4: a duplicate insert is refused; acks cannot be changed, deleted or forged", async () => {
     const duplicate = await owner.client
       .from("ceiling_alert_acks")
-      .insert({ year: CEILING_YEAR, threshold: 70 });
+      .insert({ year: YEAR, threshold: 70 });
     expect(duplicate.error?.code).toBe(UNIQUE_VIOLATION);
     const forged = await owner.client
       .from("ceiling_alert_acks")
@@ -285,19 +298,60 @@ describe("CEIL-4: ceiling_alert_acks", () => {
     const update = await owner.client
       .from("ceiling_alert_acks")
       .update({ threshold: 95 })
-      .eq("year", CEILING_YEAR);
+      .eq("year", YEAR);
     expect(update.error?.code).toBe(INSUFFICIENT_PRIVILEGE);
-    const removed = await admin.client.from("ceiling_alert_acks").delete().eq("year", CEILING_YEAR);
+    const removed = await admin.client.from("ceiling_alert_acks").delete().eq("year", YEAR);
     expect(removed.error?.code).toBe(INSUFFICIENT_PRIVILEGE);
     const hundred = await owner.client
       .from("ceiling_alert_acks")
-      .insert({ year: CEILING_YEAR, threshold: 100 });
+      .insert({ year: YEAR, threshold: 100 });
     expect(hundred.error?.code).toBe(CHECK_VIOLATION);
     const rpc = await owner.client.rpc("acknowledge_ceiling_alert", {
-      p_year: CEILING_YEAR,
+      p_year: YEAR,
       p_threshold: 100,
     });
     expect(rpc.error?.code).toBe("22023");
+    await clearCeilingYear();
+  });
+
+  it("CEIL-4 (M4.1 carry-over): a threshold the turnover has not reached cannot be acknowledged, by any writer", async () => {
+    await clearCeilingYear();
+    // No ceiling for the year: nothing can be acknowledged.
+    expect(await acknowledgeCeilingAlert(owner.client, NEXT_YEAR, 70)).toBe("not_crossed");
+    await setCeiling(NEXT_YEAR, 90_000);
+    expect(await acknowledgeCeilingAlert(owner.client, NEXT_YEAR, 85)).toBe("not_crossed");
+    expect(await acknowledgeCeilingAlert(admin.client, NEXT_YEAR, 95)).toBe("not_crossed");
+    const direct = await owner.client
+      .from("ceiling_alert_acks")
+      .insert({ year: NEXT_YEAR, threshold: 85 });
+    expect(direct.error?.code).toBe("HKC01");
+    const none = await service.from("ceiling_alert_acks").select("threshold").eq("year", NEXT_YEAR);
+    expect(none.data).toEqual([]);
+    // 70% is crossed (77.7%).
+    expect(await acknowledgeCeilingAlert(owner.client, NEXT_YEAR, 70)).toBe("acknowledged");
+    const acked = await service
+      .from("ceiling_alert_acks")
+      .select("threshold")
+      .eq("year", NEXT_YEAR);
+    expect(acked.data).toEqual([{ threshold: 70 }]);
+    // Exactly at the threshold counts as crossed: 70,000 is 70% of 100,000.
+    await service
+      .from("tax_year_settings")
+      .update({ exempt_ceiling: 100_000 })
+      .eq("year", NEXT_YEAR);
+    expect(await acknowledgeCeilingAlert(owner.client, NEXT_YEAR, 70)).toBe("acknowledged");
+    // One agora less than 85%: 70,000 / 82,353 = 84.9997%.
+    await service
+      .from("tax_year_settings")
+      .update({ exempt_ceiling: 82_353 })
+      .eq("year", NEXT_YEAR);
+    expect(await acknowledgeCeilingAlert(owner.client, NEXT_YEAR, 85)).toBe("not_crossed");
+    await service
+      .from("tax_year_settings")
+      .update({ exempt_ceiling: 82_352 })
+      .eq("year", NEXT_YEAR);
+    expect(await acknowledgeCeilingAlert(owner.client, NEXT_YEAR, 85)).toBe("acknowledged");
+    await clearCeilingYear();
   });
 });
 

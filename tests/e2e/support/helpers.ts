@@ -95,7 +95,7 @@ export function clickThreeTimesSynchronously(page: Page, buttonName: string) {
 }
 
 /** Owner decision (M3): on mobile these items sit behind "עוד" in the bottom bar. */
-const MORE_NAV_LABELS = ["חובות", "הוצאות", "הגדרות"];
+const MORE_NAV_LABELS = ["חובות", "הוצאות", "ייצוא", "הגדרות"];
 /** Tailwind's md breakpoint: from here the side navigation shows every item. */
 const DESKTOP_MIN_WIDTH = 768;
 

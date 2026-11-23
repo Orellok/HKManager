@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { daysBetween, formatIsoDate, isIsoDate, isIsoDateInRange, todayInJerusalem } from "./dates";
+import {
+  addDays,
+  daysBetween,
+  formatIsoDate,
+  isIsoDate,
+  isIsoDateInRange,
+  todayInJerusalem,
+} from "./dates";
 
 describe("isIsoDate", () => {
   it.each(["2026-11-16", "2024-02-29", "2026-12-31", "2027-01-01", "1900-01-01", "2100-12-31"])(
@@ -116,5 +123,24 @@ describe("todayInJerusalem", () => {
 
   it("MS-2: without an argument it reads the current clock", () => {
     expect(isIsoDate(todayInJerusalem())).toBe(true);
+  });
+});
+
+describe("addDays", () => {
+  it.each([
+    ["2026-01-01", -1, "2025-12-31"],
+    ["2025-12-31", 1, "2026-01-01"],
+    ["2028-02-28", 1, "2028-02-29"],
+    ["2027-02-28", 1, "2027-03-01"],
+    ["2026-03-27", 1, "2026-03-28"],
+    ["2026-10-25", 1, "2026-10-26"],
+    ["2031-01-01", -1, "2030-12-31"],
+    ["2026-11-23", 0, "2026-11-23"],
+  ])("EXPORT-1: %s plus %i days is %s, across year ends, leap days and DST", (from, days, to) => {
+    expect(addDays(from, days)).toBe(to);
+  });
+
+  it("EXPORT-1: rejects a date that is not YYYY-MM-DD", () => {
+    expect(() => addDays("2026-02-30", 1)).toThrow(RangeError);
   });
 });

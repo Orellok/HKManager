@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ceilingAckedMessage,
+  ceilingNotCrossedMessage,
   ceilingStatus,
   formatCeilingPercent,
   hasReached,
@@ -96,5 +98,34 @@ describe("CEIL-3..6: ceiling status", () => {
     expect(() => statusAt(-1)).toThrow(RangeError);
     expect(() => statusAt(1.5)).toThrow(RangeError);
     expect(() => statusAt(1, [], 0)).toThrow(RangeError);
+  });
+});
+
+describe("CEIL-4: acknowledgement messages (M4.1 carry-over)", () => {
+  it.each([
+    [
+      70,
+      "ההתראה אושרה: התראת 70% לא תוצג שוב בשנת 2026. התראה חדשה תוצג אם המחזור יעבור 85% מהתקרה.",
+    ],
+    [
+      85,
+      "ההתראה אושרה: התראת 85% לא תוצג שוב בשנת 2026. התראה חדשה תוצג אם המחזור יעבור 95% מהתקרה.",
+    ],
+    [
+      95,
+      "ההתראה אושרה: התראת 95% לא תוצג שוב בשנת 2026. אם המחזור יגיע לתקרה (100%) תוצג התראה קבועה.",
+    ],
+  ] as const)("CEIL-4: acknowledging %i%% says what still shows", (threshold, message) => {
+    expect(ceilingAckedMessage(2026, threshold)).toBe(message);
+  });
+
+  it("CEIL-4: names the year of the acknowledged banner, not the current one", () => {
+    expect(ceilingAckedMessage(2031, 70)).toContain("בשנת 2031");
+  });
+
+  it("CEIL-4: a refused acknowledgement names the year and threshold", () => {
+    expect(ceilingNotCrossedMessage(2026, 85)).toBe(
+      "ההתראה לא אושרה: המחזור בשנת 2026 לא הגיע ל-85% מהתקרה. הנתונים בדף עודכנו.",
+    );
   });
 });

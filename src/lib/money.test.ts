@@ -5,6 +5,7 @@ import {
   agorotFromDb,
   agorotTotalFromDb,
   balanceAgorotFromDb,
+  agorotToDecimal,
   agorotToShekelInput,
   formatAgorot,
   formatWholeShekels,
@@ -198,5 +199,24 @@ describe("formatWholeShekels (chart axis labels)", () => {
     // A scale's fractional tick is rounded to agorot first.
     expect(formatWholeShekels(349_999.6)).toBe(whole(3_500));
     expect(formatWholeShekels(9_999_999_999)).toBe(whole(100_000_000));
+  });
+});
+
+describe("agorotToDecimal", () => {
+  it.each([
+    [0, "0.00"],
+    [1, "0.01"],
+    [10, "0.10"],
+    [100, "1.00"],
+    [1_250_050, "12500.50"],
+    [9_999_999_999, "99999999.99"],
+    [123_456_789_012_345, "1234567890123.45"],
+  ])("EXPORT-2: %i agorot is %s shekels, exactly two decimals, no grouping", (agorot, text) => {
+    expect(agorotToDecimal(agorot)).toBe(text);
+  });
+
+  it("EXPORT-2: rejects an amount that is not a safe integer", () => {
+    expect(() => agorotToDecimal(1.5)).toThrow(RangeError);
+    expect(() => agorotToDecimal(Number.MAX_SAFE_INTEGER + 1)).toThrow(RangeError);
   });
 });

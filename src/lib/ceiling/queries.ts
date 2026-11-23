@@ -91,17 +91,27 @@ export async function updateTaxYearCeiling(
   return data.length > 0 ? { status: "saved" } : { status: "not_found" };
 }
 
+/** Raised by acknowledge_ceiling_alert(): the year's turnover is below the threshold. */
+const THRESHOLD_NOT_CROSSED = "HKC01";
+
+/** "not_crossed": the year has no ceiling or its turnover has not reached the threshold. */
+export type AckCeilingResult = "acknowledged" | "not_crossed";
+
 /** CEIL-4: acknowledges a threshold of a year (and every lower one), for both users. */
 export async function acknowledgeCeilingAlert(
   supabase: SupabaseClient,
   year: number,
   threshold: CeilingThreshold,
-): Promise<void> {
+): Promise<AckCeilingResult> {
   const { error } = await supabase.rpc("acknowledge_ceiling_alert", {
     p_year: year,
     p_threshold: threshold,
   });
+  if (error?.code === THRESHOLD_NOT_CROSSED) {
+    return "not_crossed";
+  }
   if (error) {
     throw new Error("Could not acknowledge the ceiling alert", { cause: error });
   }
+  return "acknowledged";
 }

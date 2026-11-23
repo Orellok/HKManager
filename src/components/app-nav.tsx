@@ -24,6 +24,8 @@ const MORE_ITEMS: readonly NavItem[] = [
   { href: "/debts", label: "חובות" },
   // EXP-4.
   { href: "/expenses", label: "הוצאות" },
+  // EXPORT-1 (M4.2).
+  { href: "/export", label: "ייצוא" },
   // SPEC 5.14 / EXP-3.
   { href: "/settings", label: "הגדרות" },
 ];

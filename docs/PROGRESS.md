@@ -46,6 +46,7 @@ Commit and push after every meaningful step.
 Resumed by owner 2026-11-22; scheduled task re-enabled by owner request.
 
 ## Next step
+Actions minutes (2026-11-23): owner hit GitHub Free 2000-min limit. Lead decision (owner pre-approved): CI on push to main + pull_request only (docs-only PRs skipped); agents run full checks locally before PR. Staging deploy for 80ec1af pending until minutes available (owner choice: public repo / pay / wait for reset).
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run); (5) Netlify account + 2 sites + NETLIFY_AUTH_TOKEN (docs/setup/netlify.md).
 VERIFY-02 checked 2026-11-16 (docs/verify/VERIFY-02-netlify.md): commercial use OK, Next 16 supported; OPEN: proxy.ts (Node runtime) on Netlify – gate on first staging deploy; credit budget (hard pause).
 Owner approved (2026-11-16): start M1 in parallel; split M1.1 Clients (CLI-1..4), M1.2 Projects (PRJ-1..3), M1.3 Milestones (MS-1..3, MS-6); MS-4/5 move to M2. M0.5 Sentry / M0.6 Netlify wait for owner accounts.

@@ -49,18 +49,18 @@ export function TasksCard({
           </div>
         ))}
       </dl>
-      {total === 0 ? (
-        <p className="text-sm">אין משימות פתוחות באיחור, להיום או למחר.</p>
-      ) : (
-        <>
-          <h4 id={LIST_HEADING_ID} className="text-sm font-medium">
-            {total > tasks.length
-              ? `${tasks.length} הראשונות מתוך ${tasksText(total)}, לפי דדליין`
-              : "לפי דדליין"}
-          </h4>
-          <TaskList tasks={tasks} today={today} labelledBy={LIST_HEADING_ID} />
-        </>
-      )}
+      <h4 id={LIST_HEADING_ID} className="text-sm font-medium">
+        {total > tasks.length
+          ? `${tasks.length} הראשונות מתוך ${tasksText(total)}, לפי דדליין`
+          : "המשימות הקרובות, לפי דדליין"}
+      </h4>
+      {/* Always rendered: after a toggle refreshes the page, the list keeps what it showed. */}
+      <TaskList
+        tasks={tasks}
+        today={today}
+        labelledBy={LIST_HEADING_ID}
+        emptyText="אין משימות פתוחות באיחור, להיום או למחר."
+      />
       <div className="flex flex-wrap gap-3">
         <Link href={TASKS_PATH} className={buttonClasses("primary")}>
           לכל המשימות

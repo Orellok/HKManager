@@ -70,6 +70,14 @@ function measure(page: Page, label: string) {
     .filter({ has: page.locator("dt", { hasText: new RegExp(`^${label}$`) }) });
 }
 
+/**
+ * The ceiling banners' live region. M6 adds the tasks card's live region further down the
+ * page; the ceiling's comes first in the document.
+ */
+function ceilingStatus(page: Page) {
+  return page.getByRole("status").first();
+}
+
 function ceilingRegion(page: Page, year: number) {
   return page.getByRole("region", { name: `תקרת עוסק פטור – ${year}` });
 }
@@ -359,7 +367,7 @@ test_.describe("CEIL-3..6: the exempt-dealer ceiling", () => {
         );
         await thresholdBanner.getByRole("button", { name: "קראתי, אפשר להסתיר" }).click();
         // M4.1 carry-over: the confirmation says what the acknowledgement covers.
-        await expect(page.getByRole("status")).toHaveText(
+        await expect(ceilingStatus(page)).toHaveText(
           `ההתראה אושרה: התראת 70% לא תוצג שוב בשנת ${year}. התראה חדשה תוצג אם המחזור יעבור 85% מהתקרה.`,
         );
         await expect(thresholdBanner).toHaveCount(0);
@@ -435,7 +443,7 @@ test_.describe("CEIL-3..6: the exempt-dealer ceiling", () => {
         await expect(banner).toBeVisible();
         const restore = await failServerActions(page, "abort");
         await banner.getByRole("button", { name: "קראתי, אפשר להסתיר" }).click();
-        await expect(page.getByRole("status")).toContainText("הפעולה לא בוצעה");
+        await expect(ceilingStatus(page)).toContainText("הפעולה לא בוצעה");
         await expect(banner).toBeVisible();
         await restore();
       } finally {
@@ -469,7 +477,7 @@ test_.describe("CEIL-3..6: the exempt-dealer ceiling", () => {
           .eq("id", incomeId);
         expect(error).toBeNull();
         await banner.getByRole("button", { name: "קראתי, אפשר להסתיר" }).click();
-        await expect(page.getByRole("status")).toHaveText(
+        await expect(ceilingStatus(page)).toHaveText(
           `ההתראה לא אושרה: המחזור בשנת ${year} לא הגיע ל-70% מהתקרה. הנתונים בדף עודכנו.`,
         );
         await expect(banner).toHaveCount(0);

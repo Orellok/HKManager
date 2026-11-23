@@ -32,19 +32,14 @@ export function CardTasks({ tasks, today, newTaskHref, from }: CardTasksProps) {
           משימה חדשה
         </Link>
       </div>
-      {tasks.items.length === 0 ? (
-        <p className="text-muted-foreground">
-          {from === "client" ? "אין משימות פתוחות ללקוח." : "אין משימות פתוחות לפרויקט."}
-        </p>
-      ) : (
-        <TaskList
-          tasks={tasks.items}
-          today={today}
-          labelledBy={HEADING_ID}
-          from={from}
-          showLinks={from === "client"}
-        />
-      )}
+      <TaskList
+        tasks={tasks.items}
+        today={today}
+        labelledBy={HEADING_ID}
+        from={from}
+        showLinks={from === "client"}
+        emptyText={from === "client" ? "אין משימות פתוחות ללקוח." : "אין משימות פתוחות לפרויקט."}
+      />
       {tasks.hasMore ? (
         <p className="text-muted-foreground text-sm">
           מוצגות {CARD_TASKS_LIMIT} המשימות הקרובות. את כולן אפשר למצוא{" "}

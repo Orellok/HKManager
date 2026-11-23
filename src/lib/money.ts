@@ -73,8 +73,11 @@ function assertAgorot(agorot: number): void {
   }
 }
 
-/** The amount as a decimal string of shekels, e.g. 1250050 → "12500.50", from its digits. */
-function agorotToDecimal(agorot: number): string {
+/**
+ * The amount as a plain decimal string of shekels with exactly two decimals and no grouping,
+ * e.g. 1250050 → "12500.50", 0 → "0.00", from its digits (EXPORT-2).
+ */
+export function agorotToDecimal(agorot: number): string {
   assertAgorot(agorot);
   const sign = agorot < 0 ? "-" : "";
   const digits = String(Math.abs(agorot)).padStart(AGOROT_PER_SHEKEL_DIGITS + 1, "0");

@@ -10,6 +10,7 @@ import {
   listPendingReceipts,
   type ReceiptsSummary,
 } from "@/lib/documents/queries";
+import { EXPORT_PATH } from "@/lib/export/range";
 import { monthOf } from "@/lib/incomes/month";
 import {
   INCOMES_PATH,
@@ -62,9 +63,14 @@ export default async function IncomesPage({ searchParams }: PageProps<"/incomes"
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">הכנסות</h1>
-        <Link href={NEW_INCOME_PATH} className={buttonClasses("primary")}>
-          הכנסה חדשה
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link href={EXPORT_PATH} className={buttonClasses("secondary")}>
+            ייצוא ל-CSV
+          </Link>
+          <Link href={NEW_INCOME_PATH} className={buttonClasses("primary")}>
+            הכנסה חדשה
+          </Link>
+        </div>
       </div>
 
       <RedirectNotice message={notice} />

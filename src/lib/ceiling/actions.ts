@@ -18,6 +18,7 @@ import {
   acknowledgeCeilingAlert,
   createTaxYearCeiling,
   updateTaxYearCeiling,
+  type AckCeilingResult,
   type SaveCeilingResult,
 } from "./queries";
 import {
@@ -26,7 +27,7 @@ import {
   validateCeilingInput,
   type CeilingField,
 } from "./schema";
-import { isCeilingThreshold } from "./status";
+import { ceilingAckedMessage, ceilingNotCrossedMessage, isCeilingThreshold } from "./status";
 
 /**
  * Server Actions of the exempt-dealer ceiling. Saving a yearly ceiling is admin only
@@ -40,7 +41,6 @@ const MESSAGES = {
   saveFailed: "השמירה נכשלה. התקרה לא נשמרה, אפשר לנסות שוב.",
   notFound: "לא נמצאה תקרה לשנה הזו. אפשר להוסיף אותה מרשימת התקרות.",
   ackFailed: "אישור ההתראה נכשל. אפשר לנסות שוב.",
-  acked: "ההתראה אושרה ולא תוצג שוב השנה.",
 } as const;
 
 /** The ceiling shows on the dashboard (CEIL-3) and in the settings. */
@@ -124,16 +124,22 @@ export async function acknowledgeCeilingAlertAction(
   if (!parsed.success || !isCeilingThreshold(parsed.data.threshold)) {
     return { message: null, error: MESSAGES.ackFailed };
   }
+  const ackYear = parsed.data.year;
+  const ackThreshold = parsed.data.threshold;
+  let result: AckCeilingResult;
   try {
-    await acknowledgeCeilingAlert(
+    result = await acknowledgeCeilingAlert(
       await createSupabaseServerClient(),
-      parsed.data.year,
-      parsed.data.threshold,
+      ackYear,
+      ackThreshold,
     );
   } catch (error) {
     logDbFailure("ceiling_alert_acks", "insert", error);
     return { message: null, error: MESSAGES.ackFailed };
   }
+  // Also after a refusal: the refreshed dashboard no longer shows the banner.
   revalidatePath("/");
-  return { message: MESSAGES.acked, error: null };
+  return result === "not_crossed"
+    ? { message: null, error: ceilingNotCrossedMessage(ackYear, ackThreshold) }
+    : { message: ceilingAckedMessage(ackYear, ackThreshold), error: null };
 }

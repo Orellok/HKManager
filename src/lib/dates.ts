@@ -93,3 +93,16 @@ export function formatIsoDate(value: string): string {
   const [, year, month, day] = match;
   return `${day}/${month}/${year}`;
 }
+
+/**
+ * The ISO date `days` calendar days after `value` (before it when negative), counted on UTC
+ * midnights so no DST change can shift it.
+ */
+export function addDays(value: string, days: number): string {
+  const date = parseIsoDate(value);
+  date.setUTCDate(date.getUTCDate() + days);
+  const year = String(date.getUTCFullYear()).padStart(4, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}

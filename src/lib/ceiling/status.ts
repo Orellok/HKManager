@@ -100,3 +100,22 @@ export const PROGRESS_MAX = 1000;
 export function progressValue(percentTenths: number): number {
   return Math.min(percentTenths, PROGRESS_MAX);
 }
+
+/**
+ * CEIL-4 (M4.1 carry-over): the confirmation after acknowledging a threshold's banner. It says
+ * exactly what the acknowledgement covers: this threshold (and the lower ones) for that year;
+ * a higher threshold still shows its own banner, and 100% shows one that cannot be dismissed.
+ */
+export function ceilingAckedMessage(year: number, threshold: CeilingThreshold): string {
+  const nextThreshold = CEILING_THRESHOLDS.find((candidate) => candidate > threshold);
+  const next =
+    nextThreshold === undefined
+      ? `אם המחזור יגיע לתקרה (${CEILING_EXCEEDED_PERCENT}%) תוצג התראה קבועה.`
+      : `התראה חדשה תוצג אם המחזור יעבור ${nextThreshold}% מהתקרה.`;
+  return `ההתראה אושרה: התראת ${threshold}% לא תוצג שוב בשנת ${year}. ${next}`;
+}
+
+/** CEIL-4: the database refused the acknowledgement, the threshold is not crossed (any more). */
+export function ceilingNotCrossedMessage(year: number, threshold: CeilingThreshold): string {
+  return `ההתראה לא אושרה: המחזור בשנת ${year} לא הגיע ל-${threshold}% מהתקרה. הנתונים בדף עודכנו.`;
+}

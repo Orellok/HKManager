@@ -5,6 +5,7 @@ import { RedirectNotice } from "@/components/redirect-notice";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { todayInJerusalem } from "@/lib/dates";
 import { listExpenseCategories, type ExpenseCategory } from "@/lib/expense-categories/queries";
+import { EXPORT_PATH } from "@/lib/export/range";
 import {
   EXPENSE_NOTICE_MESSAGES,
   MISSING_DOCUMENT_PARAM,
@@ -60,9 +61,14 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">הוצאות</h1>
-        <Link href={NEW_EXPENSE_PATH} className={buttonClasses("primary")}>
-          הוצאה חדשה
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link href={EXPORT_PATH} className={buttonClasses("secondary")}>
+            ייצוא ל-CSV
+          </Link>
+          <Link href={NEW_EXPENSE_PATH} className={buttonClasses("primary")}>
+            הוצאה חדשה
+          </Link>
+        </div>
       </div>
 
       <RedirectNotice message={notice} persistent={isPersistentExpenseNotice(noticeCode)} />

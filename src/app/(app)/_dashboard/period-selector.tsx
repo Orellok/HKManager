@@ -117,6 +117,10 @@ export function PeriodSelector({
                 חודש
               </label>
               <input
+                // M4.1 carry-over: a key per type and value, so React never reuses the month
+                // input as the year input, and the field shows the new period after the
+                // previous/next links (defaultValue only applies when an input mounts).
+                key={`month-${period.month}`}
                 id="dashboard-month"
                 name={MONTH_PARAM}
                 type="month"
@@ -132,6 +136,7 @@ export function PeriodSelector({
                 שנה
               </label>
               <input
+                key={`year-${period.year}`}
                 id="dashboard-year"
                 name={YEAR_PARAM}
                 type="number"

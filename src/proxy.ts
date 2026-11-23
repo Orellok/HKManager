@@ -5,6 +5,7 @@ import { LOGIN_PATH, UNAUTHORIZED_PATH, decideUserAccess, isPublicPath } from "@
 import { fetchIsAllowedUser } from "@/lib/auth/roles";
 import {
   NONCE_REQUEST_HEADER,
+  STATIC_SECURITY_HEADERS,
   buildContentSecurityPolicy,
   generateNonce,
 } from "@/lib/security-headers";
@@ -82,6 +83,11 @@ export async function proxy(request: NextRequest) {
     response = NextResponse.next({ request: { headers: requestHeaders } });
   }
 
+  // next.config headers() are not applied to proxy-generated responses on every host
+  // (Netlify skips them on redirects), so SPEC 8's static headers are set here as well.
+  for (const { key, value } of STATIC_SECURITY_HEADERS) {
+    response.headers.set(key, value);
+  }
   response.headers.set(CSP_HEADER, contentSecurityPolicy);
   for (const { name, value, options } of pendingCookies) {
     response.cookies.set(name, value, options);

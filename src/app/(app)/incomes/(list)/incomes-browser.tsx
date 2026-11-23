@@ -7,11 +7,9 @@ import { Button, buttonClasses } from "@/components/button";
 import { useHydrated } from "@/components/use-hydrated";
 import { useGuardedTransition } from "@/components/use-guarded-transition";
 import { callServerAction } from "@/lib/auth/action-failure";
-import { formatIsoDate } from "@/lib/dates";
 import { searchIncomesAction } from "@/lib/incomes/actions";
 import { MAX_MONTH, MIN_MONTH, formatMonth, isMonth } from "@/lib/incomes/month";
 import { NEW_INCOME_PATH, editIncomePath } from "@/lib/incomes/paths";
-import { PAYMENT_METHOD_LABELS } from "@/lib/incomes/payment-methods";
 import {
   ARCHIVED_FILTER_CLIENTS_LIMIT,
   type IncomeListItem,
@@ -21,6 +19,8 @@ import {
 import { formatAgorot } from "@/lib/money";
 import { appendPage, type PagedListState } from "@/lib/paged-list";
 import { CLIENT_OPTIONS_LIMIT, type ClientOption } from "@/lib/projects/queries";
+
+import { IncomeListRow } from "./income-list-row";
 
 type Filter = { month: string; clientId: string };
 
@@ -266,31 +266,7 @@ export function IncomesBrowser({
         >
           {state.items.map((income) => (
             <li key={income.id}>
-              <Link
-                href={editIncomePath(income.id)}
-                className="hover:bg-accent flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2"
-              >
-                <span className="min-w-0 space-y-0.5">
-                  <span className="block font-medium wrap-anywhere">{income.client_name}</span>
-                  {income.project_name !== null ? (
-                    <span className="text-muted-foreground block text-sm wrap-anywhere">
-                      {income.project_name}
-                      {income.milestone_description !== null
-                        ? ` – ${income.milestone_description}`
-                        : null}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground block text-sm">ללא פרויקט</span>
-                  )}
-                </span>
-                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                  <span>{formatIsoDate(income.received_date)}</span>
-                  <span className="text-muted-foreground">
-                    {PAYMENT_METHOD_LABELS[income.payment_method]}
-                  </span>
-                  <span className="text-base font-semibold">{formatAgorot(income.amount)}</span>
-                </span>
-              </Link>
+              <IncomeListRow income={income} href={editIncomePath(income.id)} />
             </li>
           ))}
         </ul>

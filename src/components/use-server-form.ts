@@ -15,6 +15,16 @@ import { useGuardedTransition } from "./use-guarded-transition";
 export const FIX_FIELDS_MESSAGE = "לא ניתן לשמור. יש לתקן את השדות המסומנים.";
 export const SAVE_UNAVAILABLE_MESSAGE = "לא ניתן לשמור כרגע. בדקו את החיבור ונסו שוב.";
 
+/**
+ * The result of a step that runs in the browser after validation and before the action,
+ * e.g. uploading a file: "ready" to call the action (with the form data the step may have
+ * added to), "rejected" to show errors instead, "redirected" when the session ended.
+ */
+export type BeforeSaveResult<Field extends string> =
+  | { status: "ready" }
+  | { status: "rejected"; fieldErrors?: FieldErrors<Field>; formError?: string }
+  | { status: "redirected" };
+
 type UseServerFormOptions<Field extends string> = {
   action: (state: ServerFormState<Field>, formData: FormData) => Promise<ServerFormState<Field>>;
   initialValues: Record<Field, string>;
@@ -27,6 +37,13 @@ type UseServerFormOptions<Field extends string> = {
    * "" (validity.badInput). Reported with the schema errors, and override them.
    */
   checkControls?: (form: HTMLFormElement) => FieldErrors<Field>;
+  /** Runs after validation and before the action, inside the same guarded save. */
+  beforeSave?: (formData: FormData) => Promise<BeforeSaveResult<Field>>;
+  /**
+   * Runs when the action answered that it did not save (errors). Never after a failed
+   * request: the server may have saved and only the answer was lost.
+   */
+  afterRejectedSave?: (formData: FormData) => void;
 };
 
 function focusField(form: HTMLFormElement | null, field: string | undefined) {
@@ -49,6 +66,8 @@ export function useServerForm<Field extends string>({
   read,
   validate,
   checkControls,
+  beforeSave,
+  afterRejectedSave,
 }: UseServerFormOptions<Field>) {
   // Without JavaScript (or before hydration) the form posts to the Server Action itself and
   // this state holds its answer. With JavaScript, handleSubmit validates in the browser and
@@ -104,9 +123,24 @@ export function useServerForm<Field extends string>({
     }
     startSave(async () => {
       setBrowserErrors(null);
+      if (beforeSave) {
+        const prepared = await beforeSave(formData);
+        if (prepared.status === "redirected") {
+          return;
+        }
+        if (prepared.status === "rejected") {
+          setBrowserState({
+            values,
+            fieldErrors: prepared.fieldErrors ?? {},
+            formError: prepared.formError ?? null,
+          });
+          return;
+        }
+      }
       // On success the action redirects; it returns only with errors.
       const result = await callServerAction(() => action(state, formData));
       if (result.status === "done") {
+        afterRejectedSave?.(formData);
         setBrowserState(result.value);
       } else if (result.status === "failed") {
         // Nothing was saved. The fields were never reset, so the input is still in the form.

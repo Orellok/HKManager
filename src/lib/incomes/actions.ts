@@ -1,20 +1,19 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import type { ActionStatus } from "@/lib/action-status";
 import { requireAllowedUser } from "@/lib/auth/guards";
-import { CLIENTS_PATH } from "@/lib/clients/paths";
 import { todayInJerusalem } from "@/lib/dates";
-import { DEBTS_PATH } from "@/lib/debts/paths";
 import type { ServerFormState } from "@/lib/forms";
 import { logDbFailure } from "@/lib/log";
 import { withNotice } from "@/lib/notices";
-import { PROJECTS_PATH, type ProjectNotice } from "@/lib/projects/paths";
+import type { ProjectNotice } from "@/lib/projects/paths";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { z } from "@/lib/zod";
 
+import { INCOME_LOCKED_MESSAGE } from "./locked";
+import { revalidateIncomeScreens } from "./revalidate";
 import { isMonth } from "./month";
 import {
   OVERPAYMENT_CONFIRM_FIELD,
@@ -23,13 +22,7 @@ import {
   overpaymentToken,
   parseOverpaymentToken,
 } from "./overpayment";
-import {
-  INCOMES_PATH,
-  RETURN_TARGETS,
-  returnPath,
-  type IncomeNotice,
-  type ReturnTarget,
-} from "./paths";
+import { RETURN_TARGETS, returnPath, type IncomeNotice, type ReturnTarget } from "./paths";
 import {
   getIncomesMonthSummary,
   listIncomeChoices,
@@ -66,17 +59,11 @@ const MESSAGES = {
     "הפרויקט או אבן הדרך כבר לא שייכים ללקוח שנבחר. ייתכן שהפרויקט הועבר ללקוח אחר. יש לבחור שוב.",
   milestoneCancelled: "אבן הדרך בוטלה, ולכן אי אפשר לרשום לה תשלום.",
   deleteFailed: "המחיקה נכשלה. אפשר לנסות שוב.",
+  // INC-4.
+  hasReceipt: INCOME_LOCKED_MESSAGE,
 } as const;
 
 const returnTargetSchema = z.enum(RETURN_TARGETS);
-
-/** Incomes appear on the incomes list, the project and client cards and in open debts. */
-function revalidateIncomeScreens() {
-  revalidatePath(INCOMES_PATH, "layout");
-  revalidatePath(PROJECTS_PATH, "layout");
-  revalidatePath(CLIENTS_PATH, "layout");
-  revalidatePath(DEBTS_PATH);
-}
 
 function refusedState(values: IncomeFormValues, refusal: IncomeRefusal): IncomeFormState {
   switch (refusal) {
@@ -96,6 +83,8 @@ function refusedState(values: IncomeFormValues, refusal: IncomeRefusal): IncomeF
       return { values, fieldErrors: {}, formError: MESSAGES.referencesMismatch };
     case "reference_missing":
       return { values, fieldErrors: {}, formError: MESSAGES.referenceMissing };
+    case "has_receipt":
+      return { values, fieldErrors: {}, formError: MESSAGES.hasReceipt };
   }
 }
 
@@ -179,7 +168,7 @@ export async function createIncomeAction(
   return saveIncomeForm(null, from, formData);
 }
 
-/** INC-1: saves changes to an income (M2.1: no receipt blocks it yet). */
+/** INC-1: saves changes to an income; INC-4: refused once the income has a receipt. */
 export async function updateIncomeAction(
   incomeId: string,
   from: ReturnTarget,
@@ -221,6 +210,9 @@ export async function deleteIncomeAction(
   }
   if (result.status === "not_found") {
     return { message: null, error: MESSAGES.notFound };
+  }
+  if (result.status === "has_receipt") {
+    return { message: null, error: MESSAGES.hasReceipt };
   }
   revalidateIncomeScreens();
   const notice: string =

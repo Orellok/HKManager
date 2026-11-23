@@ -43,6 +43,14 @@ export type SeedIncome = {
   notes?: string;
 };
 
+export type SeedReceipt = {
+  income_id: string;
+  doc_number: string;
+  issued_date: string;
+  /** A link to the receipt (seeded receipts never have a stored file). */
+  url?: string;
+};
+
 type DataFixtures = {
   token: string;
   seedClient: (client: SeedClient) => Promise<string>;
@@ -50,6 +58,8 @@ type DataFixtures = {
   /** Milestones go last in their project's list, in the order they are seeded. */
   seedMilestone: (milestone: SeedMilestone) => Promise<string>;
   seedIncome: (income: SeedIncome) => Promise<string>;
+  /** Records a receipt (with a link) for an income: the income becomes receipt_issued. */
+  seedReceipt: (receipt: SeedReceipt) => Promise<string>;
 };
 
 async function insertRow(table: string, row: object): Promise<string> {
@@ -64,10 +74,60 @@ async function insertRow(table: string, row: object): Promise<string> {
   return data.id as string;
 }
 
+const RECEIPTS_BUCKET = "receipts";
+
+/**
+ * Removes the receipts of the incomes (users cannot delete them; the service role can) and
+ * every file stored under the incomes in the receipts bucket. Returns the documents' ids, so
+ * their audit rows can be removed too.
+ */
+async function removeReceipts(incomeIds: readonly string[]): Promise<string[]> {
+  const service = createServiceRoleClient();
+  const { data: documents, error } = await service
+    .from("documents")
+    .select("id")
+    .in("income_id", incomeIds);
+  if (error) {
+    throw new Error("Could not find E2E receipts to clean up", { cause: error });
+  }
+  const listings = await Promise.all(
+    incomeIds.map((id) => service.storage.from(RECEIPTS_BUCKET).list(id)),
+  );
+  const paths = listings.flatMap(({ data }, index) =>
+    (data ?? []).map((object) => `${incomeIds[index]}/${object.name}`),
+  );
+  if (paths.length > 0) {
+    const { error: storageError } = await service.storage.from(RECEIPTS_BUCKET).remove(paths);
+    if (storageError) {
+      throw new Error("Could not clean up E2E receipt files", { cause: storageError });
+    }
+  }
+  const documentIds = (documents ?? []).map((document) => document.id as string);
+  if (documentIds.length > 0) {
+    // Kept with ON DELETE RESTRICT, so they go first.
+    const { error: recordedError } = await service
+      .from("recorded_receipt_files")
+      .delete()
+      .in("document_id", documentIds);
+    if (recordedError) {
+      throw new Error("Could not clean up E2E recorded receipt files", { cause: recordedError });
+    }
+  }
+  const { error: deleteError } = await service
+    .from("documents")
+    .delete()
+    .in("income_id", incomeIds);
+  if (deleteError) {
+    throw new Error("Could not clean up E2E receipts", { cause: deleteError });
+  }
+  return documentIds;
+}
+
 /**
  * Each test gets a unique token to put inside every client and project name it creates, so
  * parallel tests and leftovers never collide, and cleanup deletes exactly its own rows:
- * incomes of its clients and projects first (with their audit log rows), then milestones of
+ * incomes of its clients and projects first (with their receipts, receipt files and audit log
+ * rows), then milestones of
  * its projects, then projects (all are ON DELETE RESTRICT), including any project of its
  * clients, then clients. Users cannot delete incomes; the service role can.
  */
@@ -111,7 +171,11 @@ export const test_ = test.extend<DataFixtures>({
       }
       const incomeIds = (incomes ?? []).map((income) => income.id as string);
       if (incomeIds.length > 0) {
-        const audit = await service.from("audit_log").delete().in("entity_id", incomeIds);
+        const documentIds = await removeReceipts(incomeIds);
+        const audit = await service
+          .from("audit_log")
+          .delete()
+          .in("entity_id", [...incomeIds, ...documentIds]);
         const removed = await service.from("incomes").delete().in("id", incomeIds);
         const incomeError = audit.error ?? removed.error;
         if (incomeError) {
@@ -144,6 +208,11 @@ export const test_ = test.extend<DataFixtures>({
   },
   seedIncome: async ({}, provide) => {
     await provide((income) => insertRow("incomes", { payment_method: "cash", ...income }));
+  },
+  seedReceipt: async ({}, provide) => {
+    await provide((receipt) =>
+      insertRow("documents", { url: "https://provider.example/receipt", ...receipt }),
+    );
   },
 });
 

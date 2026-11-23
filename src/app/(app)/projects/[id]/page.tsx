@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { buttonClasses } from "@/components/button";
 import { ProjectStatusBadge } from "@/components/project-status-badge";
+import { ReceiptStatusBadge } from "@/components/receipt-status-badge";
 import { RedirectNotice } from "@/components/redirect-notice";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { clientPath } from "@/lib/clients/paths";
@@ -177,10 +178,11 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                 key={payment.id}
                 className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-1"
               >
-                <span className="flex flex-wrap gap-x-3">
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span>{payment.receivedDate}</span>
                   <span className="font-medium">{payment.amount}</span>
                   <span className="text-muted-foreground">{payment.paymentMethod}</span>
+                  <ReceiptStatusBadge status={payment.receiptStatus} />
                 </span>
                 <Link
                   href={payment.editHref}

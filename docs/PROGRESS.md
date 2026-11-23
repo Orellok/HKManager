@@ -33,7 +33,7 @@ Commit and push after every meaningful step.
 | M1.3 Milestones + open debts | DONE – review APPROVED, QA PASS, 1 polish round (sort_order bound, server-side move result, test robustness) | docs/specs/m1-3-milestones.md | docs/specs/m1-3-milestones.md |
 | M2.1 Incomes + payments | DONE – review APPROVED, QA PASS, 3 fix rounds (Enter confirmed overpayment + token/batching/deleted_at; E2E hydration race; notice after hard load/Back, 44px links, archived clients in filter) | docs/specs/m2-1-incomes.md |
 | M2.2 Receipts (manual) | DONE – review APPROVED (2 review fix rounds), QA PASS (0 QA rounds) | docs/specs/m2-2-receipts.md | docs/specs/m2-2-receipts.md | docs/specs/m2-1-incomes.md |
-| M3 Expenses + uploads | criteria approved – in implementation | docs/specs/m3-expenses.md |
+| M3 Expenses + uploads | implemented (32438c0, ccc0c76, 88670e1) – in QA | docs/specs/m3-expenses.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 Resumed by owner 2026-11-22; scheduled task re-enabled by owner request.
@@ -42,7 +42,9 @@ Resumed by owner 2026-11-22; scheduled task re-enabled by owner request.
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run); (5) Netlify account + 2 sites + NETLIFY_AUTH_TOKEN (docs/setup/netlify.md).
 VERIFY-02 checked 2026-11-16 (docs/verify/VERIFY-02-netlify.md): commercial use OK, Next 16 supported; OPEN: proxy.ts (Node runtime) on Netlify – gate on first staging deploy; credit budget (hard pause).
 Owner approved (2026-11-16): start M1 in parallel; split M1.1 Clients (CLI-1..4), M1.2 Projects (PRJ-1..3), M1.3 Milestones (MS-1..3, MS-6); MS-4/5 move to M2. M0.5 Sentry / M0.6 Netlify wait for owner accounts.
-M1.3 PR Orellok/HKManager#5 merged by owner. M2.1 PR: Orellok/HKManager#6. M2.2 PR: Orellok/HKManager#7. Now: senior-developer on M3, then QA (max 2 fix rounds), then PR. Owner approved M3 plan 2026-11-23.
+M1.3 PR Orellok/HKManager#5 merged by owner. M2.1 PR: Orellok/HKManager#6. M2.2 PR: Orellok/HKManager#7. Now: QA of M3 (max 2 fix rounds), then PR, then M0.6.
+Lead decision (owner pre-approved) 2026-11-23: accept M3 deviations and copy (vendor required ≤120; category name unique ≤50, max 100, never deleted, no audit; single-month list; replace-only file, old kept; 40MB raw limit; root random paths; no-file redirect notice).
+Lead process note: commit only docs/PROGRESS.md (never `git commit -a`) while an agent is working. Owner approved M3 plan 2026-11-23.
 Next after M3 (owner, 2026-11-23): M0.6 Netlify staging deploy so the owner can try the app. Owner prerequisites: Netlify account + 2 sites + NETLIFY_AUTH_TOKEN; 3 Supabase GitHub secrets; Google OAuth client; Supabase staging auth settings; real allowlist emails in staging.
 Carry into next feature: receipt-number message for leading -// ; case-insensitive doc_number uniqueness (owner decision?); payment edit link aria-label label-in-name (milestone-list.tsx:234). Staging smoke step before prod: record one PDF receipt on staging (FOR SHARE on storage.objects runs as postgres via SECURITY DEFINER). Rounds used: 2 of 3. Known flake: AUTH-2 allowlist-removal E2E on android under load. Owner approved M2.2 criteria 2026-11-17. Pending: owner to confirm M2.1 round-3 copy (notice stays until next action; 500/500 filter hint).
 Carry into M2.2: MS-6 debts paging E2E is flaky under parallel workers (reads count() before list loads; shared 1900-01-01 seed) – wait for first row and use worker-unique dates. No fix rounds left – any remaining blocking item goes to the owner. Note: no-JS users cannot pick a client on /incomes/new (not required by spec).

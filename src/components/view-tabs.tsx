@@ -8,15 +8,21 @@ type ViewTabsProps = {
   label: string;
   tabs: readonly ViewTab[];
   current: string;
+  /**
+   * A navigation landmark (the default), or a labelled group when the tabs are one control
+   * among others in a section (the dashboard's period), so the screen's landmarks stay few.
+   */
+  landmark?: boolean;
 };
 
 /**
  * Links that switch a list between views (active / archive). The current one has
  * aria-current="page" and bold text with a filled background, not color alone.
  */
-export function ViewTabs({ label, tabs, current }: ViewTabsProps) {
+export function ViewTabs({ label, tabs, current, landmark = true }: ViewTabsProps) {
+  const Container = landmark ? "nav" : "div";
   return (
-    <nav aria-label={label}>
+    <Container aria-label={label} role={landmark ? undefined : "group"}>
       <ul className="flex gap-2">
         {tabs.map((tab) => {
           const isCurrent = tab.key === current;
@@ -38,6 +44,6 @@ export function ViewTabs({ label, tabs, current }: ViewTabsProps) {
           );
         })}
       </ul>
-    </nav>
+    </Container>
   );
 }

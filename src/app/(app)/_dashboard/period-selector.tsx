@@ -76,13 +76,14 @@ export function PeriodSelector({
       </h2>
       <ViewTabs
         label="סוג התקופה"
+        landmark={false}
         current={period.kind}
         tabs={[
           { key: "month", label: "חודש", href: periodHref(monthViewOf(period, currentMonth)) },
           { key: "year", label: "שנה", href: periodHref(yearViewOf(period)) },
         ]}
       />
-      <nav aria-label="מעבר בין תקופות">
+      <div role="group" aria-label="מעבר בין תקופות">
         <ul className="flex flex-wrap gap-2">
           {previous ? (
             <li>
@@ -99,7 +100,7 @@ export function PeriodSelector({
             </li>
           ) : null}
         </ul>
-      </nav>
+      </div>
       {/* An empty or invalid value shows the current month (parsePeriod), so the form needs no
           validation of its own. */}
       <Form

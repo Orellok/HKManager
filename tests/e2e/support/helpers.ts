@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+import { expect, type Page, type Route } from "@playwright/test";
 
 /** Viewport widths checked per Playwright project (profile: 360, 412 Android; 1280 desktop). */
 export const VIEWPORT_WIDTHS_BY_PROJECT: Record<string, number[]> = {
@@ -92,4 +92,52 @@ export function clickThreeTimesSynchronously(page: Page, buttonName: string) {
     button.click();
     button.click();
   }, buttonName);
+}
+
+/** Owner decision (M3): on mobile these items sit behind "עוד" in the bottom bar. */
+const MORE_NAV_LABELS = ["חובות", "הוצאות", "הגדרות"];
+/** Tailwind's md breakpoint: from here the side navigation shows every item. */
+const DESKTOP_MIN_WIDTH = 768;
+
+function mainNav(page: Page) {
+  return page.getByRole("navigation", { name: "ניווט ראשי" });
+}
+
+function isBehindMore(page: Page, label: string): boolean {
+  return MORE_NAV_LABELS.includes(label) && (page.viewportSize()?.width ?? 0) < DESKTOP_MIN_WIDTH;
+}
+
+/**
+ * Opens a screen from the main navigation. On mobile, an item behind "עוד" is reached by
+ * opening it first (retried until the page is interactive: before hydration the button does
+ * nothing).
+ */
+export async function clickNavItem(page: Page, label: string) {
+  const nav = mainNav(page);
+  const link = nav.getByRole("link", { name: label, exact: true });
+  if (isBehindMore(page, label)) {
+    await expect(async () => {
+      if (!(await link.isVisible())) {
+        await nav.getByRole("button", { name: "עוד" }).click();
+      }
+      await expect(link).toBeVisible({ timeout: 1000 });
+    }).toPass();
+  }
+  await link.click();
+}
+
+/**
+ * Asserts the main navigation marks `label` as the current screen: its link (aria-current
+ * "page"), or on mobile for an item behind "עוד", the "עוד" button (aria-current "true").
+ */
+export async function expectNavCurrent(page: Page, label: string) {
+  const nav = mainNav(page);
+  if (isBehindMore(page, label)) {
+    await expect(nav.getByRole("button", { name: "עוד" })).toHaveAttribute("aria-current", "true");
+  } else {
+    await expect(nav.getByRole("link", { name: label, exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  }
 }

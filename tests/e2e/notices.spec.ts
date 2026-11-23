@@ -204,7 +204,7 @@ test_.describe("M2.1-11(b): redirect notices and Back", () => {
       await page.goBack();
 
       await expect(page).toHaveURL(cleanUrl(path));
-      await expect(page.getByRole("link", { name: /^עריכת תשלום/ })).toBeVisible();
+      await expect(page.getByRole("link", { name: /^עריכה: תשלום מ-/ })).toBeVisible();
       await expectNoNotice(page, "התשלום נרשם.");
     },
   );

@@ -1,8 +1,8 @@
-import { notFound } from "next/navigation";
-
 import { listIncomeChoices, type IncomeChoices } from "@/lib/incomes/queries";
 import { logDbFailure } from "@/lib/log";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+import { loadRecordOrNotFound } from "../load-or-not-found";
 
 /**
  * The projects and milestones the income form offers for `clientId` (null: none yet), with
@@ -29,16 +29,5 @@ export async function loadOrNotFound<Row>(
   operation: string,
   read: () => Promise<Row | null>,
 ): Promise<Row> {
-  let row: Row | null;
-  try {
-    row = await read();
-  } catch (error) {
-    // Logged by code only; the error boundary gets no database details (SPEC 8).
-    logDbFailure("incomes", operation, error);
-    throw new Error("Could not load the income form");
-  }
-  if (!row) {
-    notFound();
-  }
-  return row;
+  return loadRecordOrNotFound("incomes", operation, read);
 }

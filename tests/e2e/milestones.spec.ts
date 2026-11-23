@@ -5,7 +5,9 @@ import { daysBetween, todayInJerusalem } from "../../src/lib/dates";
 import { createServiceRoleClient, expect, test_ } from "./support/data-fixtures";
 import {
   VIEWPORT_WIDTHS_BY_PROJECT,
+  clickNavItem,
   clickThreeTimesSynchronously,
+  expectNavCurrent,
   failServerActions,
   hasHorizontalScroll,
   trackCspViolations,
@@ -622,14 +624,10 @@ test_.describe("MS-6: open debts", () => {
       }
 
       await page.goto("/");
-      await page
-        .getByRole("navigation", { name: "ניווט ראשי" })
-        .getByRole("link", { name: "חובות" })
-        .click();
+      // Owner decision (M3): on mobile חובות is behind "עוד".
+      await clickNavItem(page, "חובות");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("חובות פתוחים");
-      await expect(
-        page.getByRole("navigation", { name: "ניווט ראשי" }).getByRole("link", { name: "חובות" }),
-      ).toHaveAttribute("aria-current", "page");
+      await expectNavCurrent(page, "חובות");
       await expect(page.getByText("סה״כ יתרות פתוחות")).toBeVisible();
 
       const list = page.getByRole("list", { name: "רשימת החובות הפתוחים" });

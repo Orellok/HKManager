@@ -142,6 +142,13 @@ describe("STATIC_SECURITY_HEADERS", () => {
     expect(headers["X-Content-Type-Options"]).toBe("nosniff");
     expect(headers["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
     expect(headers["X-Frame-Options"]).toBe("DENY");
-    expect(headers["Permissions-Policy"]).toContain("camera=()");
+    expect(headers["Permissions-Policy"]).toBe(
+      "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+    );
+  });
+
+  it("EXP-2: the camera is allowed for the app's own pages only (receipt photos), nothing else changes", () => {
+    expect(headers["Permissions-Policy"]).toContain("camera=(self)");
+    expect(headers["Permissions-Policy"]).not.toContain("camera=()");
   });
 });

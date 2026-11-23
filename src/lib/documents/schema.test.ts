@@ -69,11 +69,20 @@ describe("validateReceiptInput", () => {
       success: true,
       data: { doc_number: "A-12/3" },
     });
-    for (const invalid of ["12 34", "קבלה1", "-12", "1".repeat(31), "12;drop"]) {
+    for (const invalid of ["12 34", "קבלה1", "1".repeat(31), "12;drop"]) {
       expect(validateReceiptInput(values({ doc_number: invalid }), TODAY)).toMatchObject({
         fieldErrors: { doc_number: RECEIPT_FIELD_MESSAGES.docNumberInvalid },
       });
     }
+  });
+
+  it("DOC-2: a receipt number starting with - or / gets a message that explains the first character", () => {
+    for (const invalid of ["-12", "/12", " -A1"]) {
+      expect(validateReceiptInput(values({ doc_number: invalid }), TODAY)).toMatchObject({
+        fieldErrors: { doc_number: RECEIPT_FIELD_MESSAGES.docNumberLeadingSymbol },
+      });
+    }
+    expect(RECEIPT_FIELD_MESSAGES.docNumberLeadingSymbol).toContain("להתחיל בספרה או באות");
   });
 
   it("DOC-2: the issue date is required and cannot be in the future; today is accepted", () => {

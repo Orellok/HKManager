@@ -231,7 +231,7 @@ export function MilestoneList({ projectId, items, headingId, emptyMessage }: Mil
                       </span>
                       <Link
                         href={payment.editHref}
-                        aria-label={`עריכת תשלום מ-${payment.receivedDate} על סך ${payment.amount}`}
+                        aria-label={`עריכה: תשלום מ-${payment.receivedDate} על סך ${payment.amount}`}
                         className="inline-flex min-h-11 min-w-11 items-center justify-center underline underline-offset-4"
                       >
                         עריכה

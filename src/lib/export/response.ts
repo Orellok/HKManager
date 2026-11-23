@@ -19,8 +19,12 @@ import {
 } from "./range";
 import { openCsvStream } from "./stream";
 
-/** Longest date value echoed back to the export screen (an ISO date has 10 characters). */
-const MAX_ECHOED_LENGTH = 10;
+/**
+ * Longest date value echoed back to the export screen: one more than an ISO date's 10
+ * characters, so an over-long value stays over-long (and is reported as invalid there)
+ * instead of being cut into a valid date that would hide the error (M6 criterion 12).
+ */
+const MAX_ECHOED_LENGTH = 11;
 
 /**
  * The export screen with the submitted dates, so it can show what is wrong next to the

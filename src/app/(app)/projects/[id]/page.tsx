@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { buttonClasses } from "@/components/button";
+import { CardTasks } from "@/components/card-tasks";
 import { ProjectStatusBadge } from "@/components/project-status-badge";
 import { ReceiptStatusBadge } from "@/components/receipt-status-badge";
 import { RedirectNotice } from "@/components/redirect-notice";
@@ -28,6 +29,8 @@ import {
   editProjectPath,
 } from "@/lib/projects/paths";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { newProjectTaskPath } from "@/lib/tasks/paths";
+import { listCardTasks, type TaskListItem } from "@/lib/tasks/queries";
 
 import { loadProjectOrNotFound } from "./load-project";
 import { ProjectMilestones, toPaymentItem } from "./project-milestones";
@@ -54,7 +57,8 @@ function balanceValue(contractAmount: number | null, paid: number): string | nul
 
 /**
  * PRJ-3: the project card: details with contract amount, paid and balance, the milestones
- * with their payments (MS-1..5) and the project's incomes without a milestone.
+ * with their payments (MS-1..5) and the project's incomes without a milestone; TASK-8: its
+ * open tasks with quick create.
  */
 export default async function ProjectPage({ params, searchParams }: PageProps<"/projects/[id]">) {
   await requireAllowedUser();
@@ -64,18 +68,21 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   let milestones: Milestone[];
   let incomes: ListPage<ProjectIncome>;
   let paid: number;
+  let tasks: ListPage<TaskListItem>;
   try {
     const supabase = await createSupabaseServerClient();
-    [milestones, incomes, paid] = await Promise.all([
+    [milestones, incomes, paid, tasks] = await Promise.all([
       listProjectMilestones(supabase, project.id),
       listProjectIncomes(supabase, project.id),
       getProjectPaidTotal(supabase, project.id),
+      listCardTasks(supabase, { projectId: project.id }),
     ]);
   } catch (error) {
     // Logged by code only; the error boundary gets no database details (SPEC 8).
-    logDbFailure("projects", "read milestones and incomes", error);
-    throw new Error("Could not load the project's milestones and incomes");
+    logDbFailure("projects", "read milestones, incomes and tasks", error);
+    throw new Error("Could not load the project's milestones, incomes and tasks");
   }
+  const today = todayInJerusalem();
   const withoutMilestone = incomes.items.filter((income) => income.milestone_id === null);
 
   const details: DetailRow[] = [
@@ -157,7 +164,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
         contractAmount={project.contract_amount}
         milestones={milestones}
         incomes={incomes.items.filter((income) => income.milestone_id !== null)}
-        today={todayInJerusalem()}
+        today={today}
       />
 
       <section aria-labelledby={INCOMES_HEADING_ID} className="space-y-3">
@@ -202,6 +209,13 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           </p>
         ) : null}
       </section>
+
+      <CardTasks
+        tasks={tasks}
+        today={today}
+        newTaskHref={newProjectTaskPath(project.id)}
+        from="project"
+      />
     </article>
   );
 }

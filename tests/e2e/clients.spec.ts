@@ -410,11 +410,23 @@ test_.describe("M1.1-8: navigation", () => {
       const isMobile = testInfo.project.name === "android";
 
       // PRJ-1 (M1.2) adds פרויקטים; owner decisions add חובות (M1.3), הכנסות (M2.1), and in M3
-      // הוצאות and הגדרות, which on mobile sit behind "עוד" with חובות; M4.2 adds ייצוא there.
+      // הוצאות and הגדרות, which on mobile sit behind "עוד" with חובות; M4.2 adds ייצוא there,
+      // and M6 משימות (with its badge) and יומן.
       await expect(nav.getByRole("link")).toHaveText(
         isMobile
           ? ["בית", "לקוחות", "פרויקטים", "הכנסות"]
-          : ["בית", "לקוחות", "פרויקטים", "הכנסות", "חובות", "הוצאות", "ייצוא", "הגדרות"],
+          : [
+              "בית",
+              "לקוחות",
+              "פרויקטים",
+              "הכנסות",
+              /^משימות/,
+              "יומן",
+              "חובות",
+              "הוצאות",
+              "ייצוא",
+              "הגדרות",
+            ],
       );
       await expect(nav.getByRole("button", { name: "עוד" })).toHaveCount(isMobile ? 1 : 0);
       await expect(nav.getByRole("link", { name: "בית" })).toHaveAttribute("aria-current", "page");
@@ -442,7 +454,7 @@ test_.describe("M1.1-8: navigation", () => {
       expect(weights).toEqual(
         isMobile
           ? ["400", "700", "400", "400"]
-          : ["400", "700", "400", "400", "400", "400", "400", "400"],
+          : ["400", "700", "400", "400", "400", "400", "400", "400", "400", "400"],
       );
     },
   );

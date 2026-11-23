@@ -1,17 +1,21 @@
 import Link from "next/link";
 
 import { buttonClasses } from "@/components/button";
+import { CardTasks } from "@/components/card-tasks";
 import { RedirectNotice } from "@/components/redirect-notice";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { logClientFailure } from "@/lib/clients/log";
 import { clientNoticeMessage } from "@/lib/clients/notices";
 import { ARCHIVED_CLIENTS_PATH, CLIENTS_PATH, editClientPath } from "@/lib/clients/paths";
+import { todayInJerusalem } from "@/lib/dates";
 import { getClientPaymentSummary, type ClientPaymentSummary } from "@/lib/incomes/queries";
 import { formatAgorot } from "@/lib/money";
 import { NOTICE_PARAM } from "@/lib/notices";
 import { listClientProjects, type ClientProject } from "@/lib/projects/queries";
 import type { ListPage } from "@/lib/paged-list";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { newClientTaskPath } from "@/lib/tasks/paths";
+import { listCardTasks, type TaskListItem } from "@/lib/tasks/queries";
 
 import { ClientProjects } from "./client-projects";
 import { ClientStatusActions } from "./client-status-actions";
@@ -19,7 +23,10 @@ import { loadClientOrNotFound } from "./load-client";
 
 type DetailRow = { label: string; value: string | null; href?: string; ltr?: boolean };
 
-/** CLI-4: the client card: details, total paid, open balance and projects. */
+/**
+ * CLI-4: the client card: details, total paid, open balance and projects; TASK-8: its open
+ * tasks with quick create.
+ */
 export default async function ClientPage({ params, searchParams }: PageProps<"/clients/[id]">) {
   await requireAllowedUser();
   const client = await loadClientOrNotFound(params);
@@ -27,16 +34,18 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/c
   const isArchived = client.archived_at !== null;
   let projects: ListPage<ClientProject>;
   let payments: ClientPaymentSummary;
+  let tasks: ListPage<TaskListItem>;
   try {
     const supabase = await createSupabaseServerClient();
-    [projects, payments] = await Promise.all([
+    [projects, payments, tasks] = await Promise.all([
       listClientProjects(supabase, client.id),
       getClientPaymentSummary(supabase, client.id),
+      listCardTasks(supabase, { clientId: client.id }),
     ]);
   } catch (error) {
     // Logged by code only; the error boundary gets no database details (SPEC 8).
-    logClientFailure("read projects and payments", error);
-    throw new Error("Could not load the client's projects and payments");
+    logClientFailure("read projects, payments and tasks", error);
+    throw new Error("Could not load the client's projects, payments and tasks");
   }
 
   const details: DetailRow[] = [
@@ -127,6 +136,13 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/c
       </section>
 
       <ClientProjects clientId={client.id} isClientArchived={isArchived} projects={projects} />
+
+      <CardTasks
+        tasks={tasks}
+        today={todayInJerusalem()}
+        newTaskHref={newClientTaskPath(client.id)}
+        from="client"
+      />
     </article>
   );
 }

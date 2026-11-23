@@ -572,7 +572,7 @@ test_.describe("PRJ-1 / MS-1: a project with milestones cannot be deleted", () =
       await dialog.getByRole("button", { name: "מחיקה לצמיתות" }).click();
 
       await expect(dialog.getByRole("alert")).toHaveText(
-        "אי אפשר למחוק פרויקט שיש לו אבני דרך או הכנסות. אפשר להעביר אותו לארכיון.",
+        "אי אפשר למחוק פרויקט שיש לו אבני דרך, הכנסות או משימות. אפשר להעביר אותו לארכיון.",
       );
       const { data } = await createServiceRoleClient()
         .from("projects")

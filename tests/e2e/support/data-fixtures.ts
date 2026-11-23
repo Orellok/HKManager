@@ -62,6 +62,17 @@ export type SeedExpense = {
   notes?: string;
 };
 
+export type SeedTask = {
+  /** Must contain the test's token, so cleanup finds it. */
+  title: string;
+  description?: string;
+  due_date?: string | null;
+  priority?: "high" | "normal" | "low";
+  status?: "open" | "done" | "cancelled";
+  client_id?: string;
+  project_id?: string;
+};
+
 type DataFixtures = {
   token: string;
   seedClient: (client: SeedClient) => Promise<string>;
@@ -75,6 +86,8 @@ type DataFixtures = {
   seedExpense: (expense: SeedExpense) => Promise<string>;
   /** An expense category at the end of the list; its name must contain the token. */
   seedCategory: (name: string) => Promise<string>;
+  /** A task (TASK-1); its title must contain the token. */
+  seedTask: (task: SeedTask) => Promise<string>;
 };
 
 async function insertRow(table: string, row: object): Promise<string> {
@@ -262,6 +275,14 @@ export const test_ = test.extend<DataFixtures>({
         }
       }
     }
+    // Tasks (M6) reference clients and projects with ON DELETE RESTRICT, so they go first.
+    const tasks = await service
+      .from("tasks")
+      .delete()
+      .or([`title.ilike.%${token}%`, ...owners].join(","));
+    if (tasks.error) {
+      throw new Error("Could not clean up E2E tasks", { cause: tasks.error });
+    }
     const milestones =
       projectIds.length > 0
         ? await service.from("milestones").delete().in("project_id", projectIds)
@@ -295,6 +316,9 @@ export const test_ = test.extend<DataFixtures>({
   },
   seedCategory: async ({}, provide) => {
     await provide((name) => insertRow("expense_categories", { name }));
+  },
+  seedTask: async ({}, provide) => {
+    await provide((task) => insertRow("tasks", task));
   },
   seedReceipt: async ({}, provide) => {
     await provide((receipt) =>

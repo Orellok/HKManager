@@ -64,15 +64,17 @@ function ActionCard({
 /**
  * DASH-5: what needs attention now: open debts (MS-6), incomes waiting for a receipt with the
  * monthly receipts counter (DOC-4/5, the card from M2.2), and this month's expenses without a
- * document (EXP-6), each with a link to its list. Today's events and tasks come with M5/M6;
- * no placeholder is shown until then.
+ * document (EXP-6), each with a link to its list, and the tasks (overdue / today / tomorrow,
+ * NOTIF-2). Today's events come with M5; no placeholder is shown until then.
  */
 export function ActionCards({
   cards,
   monthlyQuota,
+  tasks,
 }: {
   cards: DashboardData["cards"];
   monthlyQuota: number;
+  tasks: ReactNode;
 }) {
   return (
     <section aria-labelledby="action-cards-heading" className="space-y-3">
@@ -80,6 +82,7 @@ export function ActionCards({
         לטיפול
       </h2>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {tasks}
         <ActionCard
           id="open-debts"
           title="חובות פתוחים"

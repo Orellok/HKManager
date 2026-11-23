@@ -40,6 +40,7 @@ describe("RLS guard", () => {
         "recorded_expense_files",
         "tax_year_settings",
         "ceiling_alert_acks",
+        "tasks",
       ]),
     );
 

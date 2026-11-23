@@ -564,7 +564,7 @@ test_.describe("CLI-4 / CLI-2: projects on the client card", () => {
       await dialog.getByRole("button", { name: "מחיקה לצמיתות" }).click();
 
       await expect(dialog.getByRole("alert")).toHaveText(
-        "אי אפשר למחוק לקוח שיש לו פרויקטים או הכנסות. אפשר להעביר אותו לארכיון.",
+        "אי אפשר למחוק לקוח שיש לו פרויקטים, הכנסות או משימות. אפשר להעביר אותו לארכיון.",
       );
       const { data } = await createServiceRoleClient()
         .from("clients")

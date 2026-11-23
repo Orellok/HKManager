@@ -263,6 +263,20 @@ test_.describe("M3-9: the עוד menu on mobile", () => {
       await expect(more).toHaveAttribute("aria-expanded", "false");
       await expect(more).toBeFocused();
 
+      // M4.1 carry-over: tabbing out of the menu (past its last link, or back before the
+      // button) closes it.
+      await more.press("Enter");
+      await expect(more).toHaveAttribute("aria-expanded", "true");
+      for (let step = 0; step < 4; step += 1) {
+        await page.keyboard.press("Tab");
+      }
+      await expect(more).toHaveAttribute("aria-expanded", "false");
+      await more.focus();
+      await more.press("Enter");
+      await expect(more).toHaveAttribute("aria-expanded", "true");
+      await page.keyboard.press("Shift+Tab");
+      await expect(more).toHaveAttribute("aria-expanded", "false");
+
       await more.click();
       await expect(more).toHaveAttribute("aria-expanded", "true");
       await page.getByRole("heading", { level: 1 }).click();

@@ -48,26 +48,28 @@ const CURRENT_CLASSES =
   "text-foreground font-bold before:bg-primary before:absolute before:inset-x-2 before:top-0 before:h-1 before:rounded-b-sm md:bg-accent md:before:inset-x-auto md:before:inset-y-2 md:before:start-0 md:before:h-auto md:before:w-1 md:before:rounded-sm";
 
 /**
- * NOTIF-1: the number of tasks to handle, as a pill next to a label. The digits are hidden
- * from screen readers, which hear the label's suffix instead (e.g. "משימות, 3 לטיפול"), so
- * the accessible name starts with the visible label. Nothing for 0.
+ * NOTIF-1: the number of tasks to handle, as a pill next to a label. The pill is hidden from
+ * screen readers; the control's aria-label (badgeName) says the count in words instead, e.g.
+ * "משימות, 3 לטיפול", starting with the visible label (WCAG 2.5.3). Nothing for 0.
  */
-function Badge({ count, kind }: { count: number; kind: "tasks" | "more" }) {
+function Badge({ count }: { count: number }) {
   if (count <= 0) {
     return null;
   }
   return (
-    <>
-      <span
-        aria-hidden="true"
-        title={count > BADGE_DISPLAY_MAX ? String(count) : undefined}
-        className="bg-destructive text-destructive-foreground ms-1.5 inline-flex min-w-6 items-center justify-center rounded-full px-1.5 text-xs leading-5 font-bold"
-      >
-        {badgeDisplayText(count)}
-      </span>
-      <span className="sr-only">{badgeSpokenSuffix(count, kind)}</span>
-    </>
+    <span
+      aria-hidden="true"
+      title={count > BADGE_DISPLAY_MAX ? String(count) : undefined}
+      className="bg-destructive text-destructive-foreground ms-1.5 inline-flex min-w-6 items-center justify-center rounded-full px-1.5 text-xs leading-5 font-bold"
+    >
+      {badgeDisplayText(count)}
+    </span>
   );
+}
+
+/** The accessible name of a control with a badge, or undefined (its text) for 0. */
+function badgeName(label: string, count: number, kind: "tasks" | "more"): string | undefined {
+  return count > 0 ? `${label}${badgeSpokenSuffix(count, kind)}` : undefined;
 }
 
 type NavLinkProps = {
@@ -84,10 +86,11 @@ function NavLink({ item, current, tasksBadge, className, onClick }: NavLinkProps
       href={item.href}
       onClick={onClick}
       aria-current={current ? "page" : undefined}
+      aria-label={item.badge === "tasks" ? badgeName(item.label, tasksBadge, "tasks") : undefined}
       className={cn(ITEM_CLASSES, current ? CURRENT_CLASSES : "text-muted-foreground", className)}
     >
       {item.label}
-      {item.badge === "tasks" ? <Badge count={tasksBadge} kind="tasks" /> : null}
+      {item.badge === "tasks" ? <Badge count={tasksBadge} /> : null}
     </Link>
   );
 }
@@ -170,6 +173,7 @@ export function AppNav({ tasksBadge }: { tasksBadge: number }) {
             aria-expanded={open}
             aria-controls={menuId}
             aria-current={moreIsCurrent ? "true" : undefined}
+            aria-label={badgeName(MORE_LABEL, tasksBadge, "more")}
             onClick={() => setOpenOn(open ? null : pathname)}
             className={cn(
               ITEM_CLASSES,
@@ -178,7 +182,7 @@ export function AppNav({ tasksBadge }: { tasksBadge: number }) {
             )}
           >
             {MORE_LABEL}
-            <Badge count={tasksBadge} kind="more" />
+            <Badge count={tasksBadge} />
           </button>
           <ul
             id={menuId}

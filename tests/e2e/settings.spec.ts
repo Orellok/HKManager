@@ -252,13 +252,20 @@ test_.describe("M3-9: the עוד menu on mobile", () => {
         await expect(more).toHaveAttribute("aria-expanded", "true", { timeout: 1000 });
       }).toPass();
       const menu = page.locator(`#${await more.getAttribute("aria-controls")}`);
-      await expect(menu.getByRole("link")).toHaveText(["חובות", "הוצאות", "ייצוא", "הגדרות"]);
+      await expect(menu.getByRole("link")).toHaveText([
+        /^משימות/,
+        "יומן",
+        "חובות",
+        "הוצאות",
+        "ייצוא",
+        "הגדרות",
+      ]);
       for (const link of await menu.getByRole("link").all()) {
         expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
       }
 
       await page.keyboard.press("Tab");
-      await expect(menu.getByRole("link", { name: "חובות" })).toBeFocused();
+      await expect(menu.getByRole("link", { name: /^משימות/ })).toBeFocused();
       await page.keyboard.press("Escape");
       await expect(more).toHaveAttribute("aria-expanded", "false");
       await expect(more).toBeFocused();
@@ -267,7 +274,7 @@ test_.describe("M3-9: the עוד menu on mobile", () => {
       // button) closes it.
       await more.press("Enter");
       await expect(more).toHaveAttribute("aria-expanded", "true");
-      for (let step = 0; step < 5; step += 1) {
+      for (let step = 0; step < 7; step += 1) {
         await page.keyboard.press("Tab");
       }
       await expect(more).toHaveAttribute("aria-expanded", "false");

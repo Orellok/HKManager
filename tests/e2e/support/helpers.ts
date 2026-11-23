@@ -95,9 +95,17 @@ export function clickThreeTimesSynchronously(page: Page, buttonName: string) {
 }
 
 /** Owner decision (M3): on mobile these items sit behind "עוד" in the bottom bar. */
-const MORE_NAV_LABELS = ["חובות", "הוצאות", "ייצוא", "הגדרות"];
+const MORE_NAV_LABELS = ["משימות", "יומן", "חובות", "הוצאות", "ייצוא", "הגדרות"];
 /** Tailwind's md breakpoint: from here the side navigation shows every item. */
 const DESKTOP_MIN_WIDTH = 768;
+
+/**
+ * A navigation link by its label. "משימות" carries the NOTIF-1 badge in its name
+ * ("משימות, 3 לטיפול"), and other tests change the count, so the suffix is allowed.
+ */
+export function navLinkName(label: string): RegExp {
+  return new RegExp(`^${label}(, .*)?$`);
+}
 
 function mainNav(page: Page) {
   return page.getByRole("navigation", { name: "ניווט ראשי" });
@@ -114,7 +122,7 @@ function isBehindMore(page: Page, label: string): boolean {
  */
 export async function clickNavItem(page: Page, label: string) {
   const nav = mainNav(page);
-  const link = nav.getByRole("link", { name: label, exact: true });
+  const link = nav.getByRole("link", { name: navLinkName(label) });
   if (isBehindMore(page, label)) {
     await expect(async () => {
       if (!(await link.isVisible())) {
@@ -135,7 +143,7 @@ export async function expectNavCurrent(page: Page, label: string) {
   if (isBehindMore(page, label)) {
     await expect(nav.getByRole("button", { name: "עוד" })).toHaveAttribute("aria-current", "true");
   } else {
-    await expect(nav.getByRole("link", { name: label, exact: true })).toHaveAttribute(
+    await expect(nav.getByRole("link", { name: navLinkName(label) })).toHaveAttribute(
       "aria-current",
       "page",
     );

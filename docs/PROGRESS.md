@@ -22,6 +22,7 @@ Commit and push after every meaningful step.
 - 2026-11-23: owner pre-approved the lead's recommendations – run autonomously, no waiting for approvals (see CLAUDE.md).
 - 2026-11-23: owner created Netlify sites hkmanager-staging and hkmanager (name available – VERIFY-02 name item closed); Site IDs recorded in docs/setup/environments.md.
 - 2026-11-23: staging migrations ran successfully on GitHub (Supabase secrets OK). Staging deploy blocked: NETLIFY_STAGING_SITE_ID / STAGING_NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY read as empty – owner to recheck they are Repository *Variables*. Lead decision (owner pre-approved): accept M6 deviations (agenda default everywhere, 14-day agenda; done stays in place until reload; badge aria text; archived links allowed; delete blocked by tasks; list limits; priority pills only high/low; mobile month = counts + day list).
+- 2026-11-23: first real staging draft deploy – proxy.ts confirmed working on Netlify (VERIFY-02 core gate PASS). Remaining gap: X-Robots-Tag missing on proxy redirect responses → hotfix branch from main (claude/fix-robots-header-redirects).
 - Owner wants work committed continuously and resumed autonomously after interruptions.
 
 ## Status

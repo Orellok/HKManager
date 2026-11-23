@@ -10,3 +10,16 @@
 # (devDependencies) so every build uses the same version.
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Defence in depth for SPEC 8: the static security headers on every response, including static
+# and CDN-served files. Must match STATIC_SECURITY_HEADERS in src/lib/security-headers.ts
+# (enforced by src/lib/netlify-headers.test.ts). The CSP is deliberately NOT set here:
+# it carries a per-request nonce and is set by src/proxy.ts only.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()"

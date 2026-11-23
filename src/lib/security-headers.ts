@@ -1,7 +1,9 @@
 /**
  * Security and indexing headers (SPEC section 8).
  *
- * Static headers are applied to every response by next.config.ts.
+ * Static headers are applied to every response by next.config.ts and, for responses the proxy
+ * produces itself (redirects), by src/proxy.ts. netlify.toml repeats them for static/CDN
+ * responses; a test keeps that copy in sync with this list.
  * The Content-Security-Policy depends on a per-request nonce and is set by src/proxy.ts.
  */
 

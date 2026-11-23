@@ -6,7 +6,9 @@
  * - / without a session is redirected to /login by src/proxy.ts (proves the proxy runs on the
  *   host: its redirects carry the nonce CSP header, the page guards' redirects do not);
  * - /login returns 200 with a nonce-based CSP that matches the nonces of the page's scripts,
- *   with a new nonce on every request;
+ *   with a new nonce on every request. Scripts the host injects from /.netlify/scripts/ (the
+ *   Netlify HUD on published deploys) are reported as warnings, not failures, as long as the CSP
+ *   uses 'strict-dynamic' and names no Netlify source, so browsers block them;
  * - prefetch-style requests to / get a redirect, not page content.
  *
  * Usage: node scripts/smoke-deploy.mts <base URL>   (exit 0: all passed, 1: a check failed,
@@ -23,6 +25,9 @@ const REQUIRED_ROBOTS_DIRECTIVES = ["noindex", "nofollow"] as const;
 const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_DETAIL_LENGTH = 200;
+/** Same-origin path of scripts Netlify injects into published pages (e.g. the deploy HUD). */
+const HOST_SCRIPT_PATH_PREFIX = "/.netlify/scripts/";
+const HOST_NAME_PATTERN = /netlify/i;
 
 /** Header sets Next.js (or a forged client) sends for prefetches; see tests/e2e/auth.spec.ts. */
 const PREFETCH_HEADER_SETS: readonly (readonly [label: string, headers: Record<string, string>])[] =
@@ -32,7 +37,7 @@ const PREFETCH_HEADER_SETS: readonly (readonly [label: string, headers: Record<s
     ["next-router-prefetch with an RSC request", { "next-router-prefetch": "1", rsc: "1" }],
   ];
 
-export type CheckResult = { name: string; ok: boolean; detail: string };
+export type CheckResult = { name: string; ok: boolean; detail: string; warnings: string[] };
 
 export type SmokeOptions = {
   fetchImpl?: typeof fetch;
@@ -174,11 +179,47 @@ export function scriptTagsWithoutNonce(html: string, nonce: string): string[] {
   return scriptTags(html).filter((tag) => !tag.includes(`nonce="${nonce}"`));
 }
 
-function checkLoginCsp(first: FetchedPage, second: FetchedPage): string | undefined {
+/** The value of a script tag's src attribute, if it has one. */
+function scriptSrc(tag: string): string | undefined {
+  const match = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i.exec(tag);
+  return match ? (match[1] ?? match[2] ?? match[3]) : undefined;
+}
+
+/**
+ * Whether a script tag is one the host injects: an external script whose src is a same-origin
+ * path under /.netlify/scripts/. Inline scripts and absolute or protocol-relative URLs never are.
+ */
+export function isHostInjectedScript(tag: string): boolean {
+  return scriptSrc(tag)?.startsWith(HOST_SCRIPT_PATH_PREFIX) ?? false;
+}
+
+/**
+ * Whether the CSP keeps host-injected scripts blocked: script-src uses 'strict-dynamic' (so
+ * browsers ignore 'self' and host sources) and names no Netlify source.
+ */
+export function cspBlocksHostScripts(csp: string | null): boolean {
+  const sources =
+    (csp ?? "")
+      .split(";")
+      .map((directive) => directive.trim().split(/\s+/))
+      .find((tokens) => tokens[0]?.toLowerCase() === "script-src")
+      ?.slice(1) ?? [];
+  return (
+    sources.some((source) => source.toLowerCase() === "'strict-dynamic'") &&
+    !sources.some((source) => HOST_NAME_PATTERN.test(source))
+  );
+}
+
+function checkLoginCsp(
+  first: FetchedPage,
+  second: FetchedPage,
+  warn: (message: string) => void,
+): string | undefined {
   if (first.status !== 200) {
     return `expected 200, got ${first.status}`;
   }
-  const nonce = scriptNonceFromCsp(first.headers.get("content-security-policy"));
+  const csp = first.headers.get("content-security-policy");
+  const nonce = scriptNonceFromCsp(csp);
   if (!nonce) {
     return "no Content-Security-Policy header with exactly one script-src nonce";
   }
@@ -186,7 +227,15 @@ function checkLoginCsp(first: FetchedPage, second: FetchedPage): string | undefi
   if (tags.length === 0) {
     return "the page has no <script> tags to compare with the CSP nonce";
   }
-  const withoutNonce = scriptTagsWithoutNonce(first.body, nonce);
+  const allWithoutNonce = scriptTagsWithoutNonce(first.body, nonce);
+  const hostScripts = allWithoutNonce.filter(isHostInjectedScript);
+  if (hostScripts.length > 0 && !cspBlocksHostScripts(csp)) {
+    return `the CSP may allow a host-injected script without the nonce (script-src needs 'strict-dynamic' and no Netlify source): ${truncate(hostScripts[0])}`;
+  }
+  for (const tag of hostScripts) {
+    warn(`host-injected script without the nonce, blocked by the CSP: ${truncate(tag)}`);
+  }
+  const withoutNonce = allWithoutNonce.filter((tag) => !isHostInjectedScript(tag));
   if (withoutNonce.length > 0) {
     return `${withoutNonce.length} of ${tags.length} <script> tags lack the CSP nonce, e.g. ${truncate(withoutNonce[0])}`;
   }
@@ -208,12 +257,21 @@ export async function runSmokeChecks(
   const results: CheckResult[] = [];
   const fetched: FetchedPage[] = [];
 
-  async function check(name: string, run: () => Promise<string | undefined>): Promise<void> {
+  async function check(
+    name: string,
+    run: (warn: (message: string) => void) => Promise<string | undefined>,
+  ): Promise<void> {
+    const warnings: string[] = [];
     try {
-      const failure = await run();
-      results.push({ name, ok: failure === undefined, detail: failure ?? "ok" });
+      const failure = await run((message) => warnings.push(message));
+      results.push({ name, ok: failure === undefined, detail: failure ?? "ok", warnings });
     } catch (error) {
-      results.push({ name, ok: false, detail: `request failed: ${describeError(error)}` });
+      results.push({
+        name,
+        ok: false,
+        detail: `request failed: ${describeError(error)}`,
+        warnings,
+      });
     }
   }
 
@@ -238,10 +296,10 @@ export async function runSmokeChecks(
     async () => expectProxyLoginRedirect(await get(HOME_PATH, `GET ${HOME_PATH}`), baseUrl),
   );
 
-  await check(`${LOGIN_PATH} returns 200 with a nonce CSP matching its scripts`, async () => {
+  await check(`${LOGIN_PATH} returns 200 with a nonce CSP matching its scripts`, async (warn) => {
     const first = await get(LOGIN_PATH, `GET ${LOGIN_PATH}`);
     const second = await get(LOGIN_PATH, `GET ${LOGIN_PATH} (again)`);
-    return checkLoginCsp(first, second);
+    return checkLoginCsp(first, second, warn);
   });
 
   for (const [label, headers] of PREFETCH_HEADER_SETS) {
@@ -265,6 +323,7 @@ export async function runSmokeChecks(
         : missingRobotsTag.length === 0
           ? `ok (${fetched.length} responses)`
           : `missing on: ${missingRobotsTag.join("; ")}`,
+    warnings: [],
   });
 
   return results;
@@ -280,8 +339,11 @@ async function main(argv: readonly string[]): Promise<number> {
   }
   console.log(`Smoke checks against ${baseUrl.origin}`);
   const results = await runSmokeChecks(baseUrl);
-  for (const { name, ok, detail } of results) {
+  for (const { name, ok, detail, warnings } of results) {
     console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : `: ${detail}`}`);
+    for (const warning of warnings) {
+      console.log(`WARN  ${name}: ${warning}`);
+    }
   }
   const failed = results.filter((result) => !result.ok).length;
   console.log(failed === 0 ? "All smoke checks passed." : `${failed} smoke check(s) failed.`);

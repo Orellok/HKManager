@@ -16,11 +16,6 @@ run-name: Staging deploy ${{ github.event.workflow_run.head_sha }}
 permissions:
   contents: read
 
-# Deploys never overlap; a newer queued run replaces an older queued one.
-concurrency:
-  group: netlify-deploy-staging
-  cancel-in-progress: false
-
 # bash -eo pipefail: a failing command anywhere in a pipeline fails the step.
 defaults:
   run:
@@ -89,6 +84,12 @@ jobs:
     name: Deploy to staging
     needs: check-ready
     if: needs.check-ready.outputs.is-ready == 'true'
+    # Deploys never overlap; a newer queued deploy replaces an older queued one. At job level,
+    # so a run that deploys nothing (check-ready says not ready) never takes the group and
+    # cannot cancel a deploy that is waiting for it.
+    concurrency:
+      group: netlify-deploy-staging
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

@@ -7,6 +7,7 @@ import {
   balanceAgorotFromDb,
   agorotToShekelInput,
   formatAgorot,
+  formatWholeShekels,
   parseShekelsToAgorot,
 } from "./money";
 
@@ -179,4 +180,23 @@ describe("balanceAgorotFromDb", () => {
       expect(() => balanceAgorotFromDb(value)).toThrow(RangeError);
     },
   );
+});
+
+describe("formatWholeShekels (chart axis labels)", () => {
+  it("DASH-3: rounds integer agorot to whole shekels, half away from zero", () => {
+    const whole = (shekels: number) =>
+      new Intl.NumberFormat("he-IL", {
+        style: "currency",
+        currency: "ILS",
+        maximumFractionDigits: 0,
+      }).format(shekels);
+    expect(formatWholeShekels(1_250_050)).toBe(whole(12_501));
+    expect(formatWholeShekels(1_250_049)).toBe(whole(12_500));
+    expect(formatWholeShekels(0)).toBe(whole(0));
+    expect(formatWholeShekels(-49)).toBe(whole(0));
+    expect(formatWholeShekels(-150)).toBe(whole(-2));
+    // A scale's fractional tick is rounded to agorot first.
+    expect(formatWholeShekels(349_999.6)).toBe(whole(3_500));
+    expect(formatWholeShekels(9_999_999_999)).toBe(whole(100_000_000));
+  });
 });

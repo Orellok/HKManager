@@ -33,6 +33,8 @@ type CategoryFilterOption = { id: string; name: string; label: string };
 type ExpensesBrowserProps = {
   /** "YYYY-MM": the month the first page was loaded with (the current month). */
   initialMonth: string;
+  /** Whether the first page holds only expenses without a document (EXP-6). */
+  initialMissingDocument: boolean;
   /** Every category in order, archived ones marked: their expenses stay reachable. */
   categoryOptions: readonly CategoryFilterOption[];
   initialPage: ExpenseListPage;
@@ -58,6 +60,7 @@ function countText(count: number): string {
  */
 export function ExpensesBrowser({
   initialMonth,
+  initialMissingDocument,
   categoryOptions,
   initialPage,
   initialSummary,
@@ -66,7 +69,7 @@ export function ExpensesBrowser({
     month: initialMonth,
     categoryId: "",
     vendor: "",
-    missingDocument: "",
+    missingDocument: initialMissingDocument ? "1" : "",
   };
   const [state, setState] = useState<BrowserState>({
     filter: initialFilter,
@@ -79,7 +82,7 @@ export function ExpensesBrowser({
   const [month, setMonth] = useState(initialMonth);
   const [categoryId, setCategoryId] = useState("");
   const [vendor, setVendor] = useState("");
-  const [missingDocument, setMissingDocument] = useState(false);
+  const [missingDocument, setMissingDocument] = useState(initialMissingDocument);
   const queuedFilter = useRef<Filter | null>(null);
   /** The filter of the list on screen, for undoing the shown filters when a load fails. */
   const shownFilter = useRef<Filter>(initialFilter);
@@ -357,17 +360,19 @@ function ExpenseListRow({ expense }: { expense: ExpenseListItem }) {
   return (
     <Link
       href={editExpensePath(expense.id)}
-      className="hover:bg-accent flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2"
+      className="group hover:bg-accent flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2"
     >
       <span className="min-w-0 space-y-0.5">
         <span className="block font-medium wrap-anywhere">{expense.vendor}</span>
-        <span className="text-muted-foreground block text-sm wrap-anywhere">
+        {/* Muted text has 4.7:1 on the page but only 4.3:1 on the hover background; on hover
+            it takes the full text color (WCAG 1.4.3). */}
+        <span className="text-muted-foreground group-hover:text-foreground block text-sm wrap-anywhere">
           {expense.category_name}
         </span>
       </span>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <span>{formatIsoDate(expense.expense_date)}</span>
-        <span className="text-muted-foreground">
+        <span className="text-muted-foreground group-hover:text-foreground">
           {PAYMENT_METHOD_LABELS[expense.payment_method]}
         </span>
         <span className="text-base font-semibold">{formatAgorot(expense.amount)}</span>

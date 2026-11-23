@@ -7,6 +7,7 @@ import { todayInJerusalem } from "@/lib/dates";
 import { listExpenseCategories, type ExpenseCategory } from "@/lib/expense-categories/queries";
 import {
   EXPENSE_NOTICE_MESSAGES,
+  MISSING_DOCUMENT_PARAM,
   NEW_EXPENSE_PATH,
   isPersistentExpenseNotice,
 } from "@/lib/expenses/paths";
@@ -27,15 +28,18 @@ import { ExpensesBrowser } from "./expenses-browser";
 /**
  * EXP-4 / EXP-6: the expenses screen: a month's expenses, newest first, filtered by month,
  * category, vendor and "חסר מסמך", with the filter's total and "load more". It opens on the
- * current month (Asia/Jerusalem) with no other filter. EXP-7: the confirmation after saving
- * with a file stays on screen.
+ * current month (Asia/Jerusalem) with no other filter, or with "חסר מסמך" when the address
+ * asks for it (`?missing=1`, the dashboard's card, DASH-5). EXP-7: the confirmation after
+ * saving with a file stays on screen.
  */
 export default async function ExpensesPage({ searchParams }: PageProps<"/expenses">) {
   await requireAllowedUser();
-  const noticeCode = (await searchParams)[NOTICE_PARAM];
+  const params = await searchParams;
+  const noticeCode = params[NOTICE_PARAM];
   const notice = noticeMessage(EXPENSE_NOTICE_MESSAGES, noticeCode);
   const month = monthOf(todayInJerusalem());
-  const filter = { month, categoryId: null, vendor: "", missingDocument: false };
+  const missingDocument = params[MISSING_DOCUMENT_PARAM] === "1";
+  const filter = { month, categoryId: null, vendor: "", missingDocument };
   let initialPage: ExpenseListPage;
   let summary: ExpensesSummary;
   let categories: ExpenseCategory[];
@@ -65,6 +69,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
 
       <ExpensesBrowser
         initialMonth={month}
+        initialMissingDocument={missingDocument}
         categoryOptions={categories.map((category) => ({
           id: category.id,
           name: category.name,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -65,7 +65,8 @@ function NavLink({ item, current, className, onClick }: NavLinkProps) {
  * desktop. The current item has aria-current="page". On mobile, "עוד" is a disclosure button
  * (aria-expanded) that shows the rest of the items above the bar; it is marked current too
  * (aria-current="true") while one of them is the current screen. Escape or a click outside
- * closes it and returns focus to the button; opening another screen closes it.
+ * closes it and returns focus to the button; moving focus out of it (Tab) or opening another
+ * screen closes it.
  */
 export function AppNav() {
   const pathname = usePathname();
@@ -98,6 +99,14 @@ export function AppNav() {
     }
   }
 
+  /** Tabbing (or any focus move) out of the menu and its button closes it. */
+  function closeOnFocusOut(event: FocusEvent<HTMLLIElement>) {
+    const next = event.relatedTarget;
+    if (open && !(next instanceof Node && moreRef.current?.contains(next))) {
+      setOpenOn(null);
+    }
+  }
+
   return (
     <nav
       aria-label="ניווט ראשי"
@@ -114,7 +123,12 @@ export function AppNav() {
             <NavLink item={item} current={isCurrent(pathname, item.href)} />
           </li>
         ))}
-        <li ref={moreRef} className="relative flex-1 md:hidden" onKeyDown={closeOnEscape}>
+        <li
+          ref={moreRef}
+          className="relative flex-1 md:hidden"
+          onKeyDown={closeOnEscape}
+          onBlur={closeOnFocusOut}
+        >
           <button
             ref={buttonRef}
             type="button"

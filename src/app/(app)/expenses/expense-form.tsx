@@ -77,6 +77,18 @@ function inputFile(form: HTMLFormElement, name: string): File | undefined {
   return input instanceof HTMLInputElement ? (input.files?.[0] ?? undefined) : undefined;
 }
 
+/**
+ * Focus for a rejected receipt goes to the input that holds it: the camera input when the
+ * receipt is a photo, otherwise the file input (the field's own name).
+ */
+function receiptFieldElement(form: HTMLFormElement, field: ExpenseField): HTMLElement | null {
+  if (field !== "file" || !inputFile(form, PHOTO_INPUT)) {
+    return null;
+  }
+  const photo = form.elements.namedItem(PHOTO_INPUT);
+  return photo instanceof HTMLInputElement ? photo : null;
+}
+
 /** The receipt chosen in the form: the photo or the file, whichever was chosen last. */
 function chosenFile(form: HTMLFormElement): File | undefined {
   return inputFile(form, PHOTO_INPUT) ?? inputFile(form, FILE_INPUT);
@@ -197,6 +209,7 @@ export function ExpenseForm({
       checkControls,
       beforeSave: uploadChosenFile,
       afterRejectedSave: removeUploadOfRejectedSave,
+      fieldElement: receiptFieldElement,
     },
   );
 

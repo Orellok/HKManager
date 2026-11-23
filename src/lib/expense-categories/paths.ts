@@ -9,9 +9,13 @@ export function editCategoryPath(id: string): string {
 }
 
 /** Codes of the one-time confirmations on the settings screen. */
-export type SettingsNotice = "category_created" | "category_renamed";
+export type SettingsNotice =
+  "category_created" | "category_renamed" | "ceiling_created" | "ceiling_updated";
 
 export const SETTINGS_NOTICE_MESSAGES: Record<SettingsNotice, string> = {
   category_created: "הקטגוריה נוספה.",
   category_renamed: "שם הקטגוריה עודכן.",
+  // CEIL-1 (admin only).
+  ceiling_created: "התקרה נשמרה.",
+  ceiling_updated: "התקרה עודכנה.",
 };

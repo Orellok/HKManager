@@ -44,11 +44,21 @@ type UseServerFormOptions<Field extends string> = {
    * request: the server may have saved and only the answer was lost.
    */
   afterRejectedSave?: (formData: FormData) => void;
+  /**
+   * The element that receives focus for an invalid field, when it is not the one named after
+   * it (e.g. the camera input when the photo it took was rejected). Pass a stable function
+   * (defined outside the component): focus moves when it changes.
+   */
+  fieldElement?: (form: HTMLFormElement, field: Field) => HTMLElement | null;
 };
 
-function focusField(form: HTMLFormElement | null, field: string | undefined) {
+function focusField<Field extends string>(
+  form: HTMLFormElement | null,
+  field: Field | undefined,
+  fieldElement?: (form: HTMLFormElement, field: Field) => HTMLElement | null,
+) {
   if (form && field) {
-    form.querySelector<HTMLElement>(`[name="${field}"]`)?.focus();
+    (fieldElement?.(form, field) ?? form.querySelector<HTMLElement>(`[name="${field}"]`))?.focus();
   }
 }
 
@@ -68,6 +78,7 @@ export function useServerForm<Field extends string>({
   checkControls,
   beforeSave,
   afterRejectedSave,
+  fieldElement,
 }: UseServerFormOptions<Field>) {
   // Without JavaScript (or before hydration) the form posts to the Server Action itself and
   // this state holds its answer. With JavaScript, handleSubmit validates in the browser and
@@ -89,8 +100,8 @@ export function useServerForm<Field extends string>({
 
   // After the server answered with errors, move focus to the first invalid field.
   useEffect(() => {
-    focusField(formRef.current, firstInvalidField(fields, state.fieldErrors));
-  }, [state, fields]);
+    focusField(formRef.current, firstInvalidField(fields, state.fieldErrors), fieldElement);
+  }, [state, fields, fieldElement]);
 
   /** Withdraws a pending save confirmation (e.g. after the user changed a field). */
   function dismissConfirmation() {
@@ -118,7 +129,7 @@ export function useServerForm<Field extends string>({
         ...controlErrors,
       };
       setBrowserErrors(fieldErrors);
-      focusField(form, firstInvalidField(fields, fieldErrors));
+      focusField(form, firstInvalidField(fields, fieldErrors), fieldElement);
       return;
     }
     startSave(async () => {

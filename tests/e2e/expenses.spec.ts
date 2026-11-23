@@ -404,7 +404,8 @@ test_.describe("EXP-2 / EXP-7: receipt photos and files", () => {
       await expect(
         page.getByText("לא הצלחנו לקרוא את התמונה. אפשר לצלם שוב או לבחור קובץ אחר."),
       ).toBeVisible();
-      await expect(field.file(page)).toBeFocused();
+      // M4.1 carry-over: focus goes to the camera input that holds the rejected photo.
+      await expect(field.photo(page)).toBeFocused();
       await expect(field.vendor(page)).toHaveValue(vendor);
       expect(uploads).toEqual([]);
       expect(await expensesOf(vendor)).toEqual([]);
@@ -538,6 +539,30 @@ test_.describe("EXP-1: editing and deleting", () => {
 });
 
 test_.describe("EXP-4 / EXP-6: filters and totals", () => {
+  test_(
+    "EXP-4 / WCAG 1.4.3: a hovered row's secondary text takes the full text color on the hover background",
+    async ({ page, token, seedExpense }, testInfo) => {
+      // Tailwind's hover: applies only where the device can hover; touch screens never get
+      // the hover background.
+      test_.skip(testInfo.project.name !== "desktop", "Hover styles apply on desktop only");
+      await seedExpense({
+        vendor: `ריחוף ${token}`,
+        amount: 1_000,
+        expense_date: todayInJerusalem(),
+        category_id: await categoryId(PRINTING),
+      });
+      await page.goto("/expenses");
+      const row = page.getByRole("link", { name: new RegExp(`ריחוף ${token}`) });
+      const category = row.getByText(PRINTING, { exact: true });
+      const vendor = row.getByText(`ריחוף ${token}`, { exact: true });
+      const colorOf = (locator: typeof vendor) =>
+        locator.evaluate((element) => getComputedStyle(element).color);
+      expect(await colorOf(category)).not.toBe(await colorOf(vendor));
+      await row.hover();
+      await expect.poll(() => colorOf(category)).toBe(await colorOf(vendor));
+    },
+  );
+
   test_(
     "EXP-4 / EXP-6: filters by month, vendor (Enter), category and missing document, with the filter's total",
     async ({ page, token, seedExpense, seedCategory }) => {

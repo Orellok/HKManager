@@ -38,6 +38,8 @@ describe("RLS guard", () => {
         "expense_categories",
         "expenses",
         "recorded_expense_files",
+        "tax_year_settings",
+        "ceiling_alert_acks",
       ]),
     );
 
@@ -51,7 +53,11 @@ describe("RLS guard", () => {
     const views = await queryLocalDatabase<ViewRow>(PUBLIC_VIEWS_SQL);
 
     expect(views.map((view) => view.view_name)).toEqual(
-      expect.arrayContaining(["milestone_balances"]),
+      expect.arrayContaining([
+        "milestone_balances",
+        "income_monthly_totals",
+        "expense_monthly_totals",
+      ]),
     );
     expect(views.filter((view) => !view.security_invoker).map((view) => view.view_name)).toEqual(
       [],

@@ -155,3 +155,23 @@ export function balanceAgorotFromDb(value: unknown): number {
   }
   return agorot;
 }
+
+const WHOLE_SHEKEL_FORMAT = new Intl.NumberFormat("he-IL", {
+  style: "currency",
+  currency: "ILS",
+  maximumFractionDigits: 0,
+});
+
+/**
+ * An amount rounded to whole shekels (half away from zero), for chart axis labels where
+ * agorot would only add noise, e.g. 1250050 → "‏12,501 ‏₪". Integer arithmetic only; a
+ * fractional input (a scale's tick position) is first rounded to whole agorot.
+ */
+export function formatWholeShekels(agorot: number): string {
+  const whole = Math.round(agorot);
+  assertAgorot(whole);
+  const magnitude = Math.abs(whole);
+  const remainder = magnitude % 100;
+  const shekels = (magnitude - remainder) / 100 + (remainder >= 50 ? 1 : 0);
+  return WHOLE_SHEKEL_FORMAT.format(whole < 0 && shekels > 0 ? -shekels : shekels);
+}

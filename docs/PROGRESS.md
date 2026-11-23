@@ -35,6 +35,7 @@ Commit and push after every meaningful step.
 | M2.2 Receipts (manual) | DONE – review APPROVED (2 review fix rounds), QA PASS (0 QA rounds) | docs/specs/m2-2-receipts.md | docs/specs/m2-2-receipts.md | docs/specs/m2-1-incomes.md |
 | M3 Expenses + uploads | DONE – QA PASS (0 fix rounds) | docs/specs/m3-expenses.md | docs/specs/m3-expenses.md |
 | M0.6 Netlify deploy | DONE – QA PASS (local only); real deploy + VERIFY-02 on host pending owner setup | docs/specs/m0-6-deploy.md | docs/specs/m0-6-deploy.md |
+| M4.1 Dashboard + ceiling | implemented (through 25f8d2a) – in QA | docs/specs/m4-1-dashboard.md |
 | M0.2 Supabase local + RLS | DONE – review APPROVED, QA PASS, 1 polish round (email length/format, test hardening), re-review APPROVED | docs/specs/m0-2-supabase-local.md |
 
 Resumed by owner 2026-11-22; scheduled task re-enabled by owner request.
@@ -43,7 +44,8 @@ Resumed by owner 2026-11-22; scheduled task re-enabled by owner request.
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run); (5) Netlify account + 2 sites + NETLIFY_AUTH_TOKEN (docs/setup/netlify.md).
 VERIFY-02 checked 2026-11-16 (docs/verify/VERIFY-02-netlify.md): commercial use OK, Next 16 supported; OPEN: proxy.ts (Node runtime) on Netlify – gate on first staging deploy; credit budget (hard pause).
 Owner approved (2026-11-16): start M1 in parallel; split M1.1 Clients (CLI-1..4), M1.2 Projects (PRJ-1..3), M1.3 Milestones (MS-1..3, MS-6); MS-4/5 move to M2. M0.5 Sentry / M0.6 Netlify wait for owner accounts.
-M1.3 PR Orellok/HKManager#5 merged by owner. M2.1 PR: Orellok/HKManager#6. M2.2 PR: Orellok/HKManager#7. M3 PR: Orellok/HKManager#8. Now: M0.6 PR; then M4 (dashboard, ceiling, CSV).
+M1.3 PR Orellok/HKManager#5 merged by owner. M2.1 PR: Orellok/HKManager#6. M2.2 PR: Orellok/HKManager#7. M3 PR: Orellok/HKManager#8. M0.6 PR: Orellok/HKManager#9 (merge after #8). Now: QA of M4.1 (max 2 fix rounds), then PR, then M4.2 CSV.
+Lead decision (owner pre-approved): accept M4.1 deviations (ceiling follows selected period's year; only highest threshold banner, ack covers lower; comparison copy; missing-doc card = this month; top-6 categories + rest; no turnover_basis UI; chart table in collapsible).
 Carry into next feature: staging-deploy.yml concurrency → job-level (no-op run can cancel pending deploy). Owner-only: Netlify/GitHub vars per docs/setup/deploy.md; then first staging deploy = VERIFY-02 on host. Lead decision: accept M0.6 deviations (prod deploy also requires prod migrations run; draft→smoke→publish; per-env variable names; token present at build; receipt/photo checks staging-only). Real deploy blocked until owner completes Netlify account/sites/token + GitHub vars.
 Carry into next UI feature: expenses row hover contrast (expenses-browser.tsx); focus to camera input after photo error. Lead decision: idempotency key for create forms (duplicate on lost response) → M7 hardening; old file re-recordable on another expense via API → M7 hardening; close 'עוד' on focus-out → next UI feature.
 Lead decision (owner pre-approved) 2026-11-23: accept M3 deviations and copy (vendor required ≤120; category name unique ≤50, max 100, never deleted, no audit; single-month list; replace-only file, old kept; 40MB raw limit; root random paths; no-file redirect notice).

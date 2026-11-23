@@ -3,6 +3,10 @@
 export const EXPENSES_PATH = "/expenses";
 export const NEW_EXPENSE_PATH = "/expenses/new";
 
+/** EXP-6 / DASH-5: opens the list on the current month's expenses without a document. */
+export const MISSING_DOCUMENT_PARAM = "missing";
+export const MISSING_DOCUMENT_EXPENSES_PATH = `${EXPENSES_PATH}?${MISSING_DOCUMENT_PARAM}=1`;
+
 export function editExpensePath(id: string): string {
   return `${EXPENSES_PATH}/${encodeURIComponent(id)}/edit`;
 }

@@ -1,83 +1,97 @@
-import Link from "next/link";
-
-import { buttonClasses } from "@/components/button";
-import { QuotaNotice } from "@/components/quota-notice";
 import { getReceiptSettings, type ReceiptSettings } from "@/lib/app-settings";
 import { requireAllowedUser } from "@/lib/auth/guards";
-import { getReceiptsSummary, type ReceiptsSummary } from "@/lib/documents/queries";
-import { PENDING_RECEIPTS_PATH } from "@/lib/incomes/paths";
+import {
+  CEILING_EXCEEDED_PERCENT,
+  ceilingStatus,
+  formatCeilingPercent,
+} from "@/lib/ceiling/status";
+import {
+  currentMonthPeriod,
+  parsePeriod,
+  periodLabel,
+  previousPeriodLabel,
+} from "@/lib/dashboard/period";
+import { getDashboardData, type DashboardData } from "@/lib/dashboard/queries";
+import { todayInJerusalem } from "@/lib/dates";
 import { logDbFailure } from "@/lib/log";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const PENDING_HEADING_ID = "pending-receipts-heading";
-
-function pendingText(count: number): string {
-  if (count === 0) {
-    return "אין הכנסות שממתינות לקבלה.";
-  }
-  return count === 1 ? "הכנסה אחת ממתינה לקבלה." : `${count} הכנסות ממתינות לקבלה.`;
-}
-
-export default async function HomePage() {
-  // AUTH-3: every page checks the session itself (see the (app) layout).
-  await requireAllowedUser();
-
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">דף הבית</h1>
-      <PendingReceiptsCard />
-    </div>
-  );
-}
+import { ActionCards } from "./_dashboard/action-cards";
+import { CategorySection } from "./_dashboard/category-section";
+import { CeilingBanners } from "./_dashboard/ceiling-banners";
+import { CeilingProgress } from "./_dashboard/ceiling-progress";
+import { MonthlySection } from "./_dashboard/monthly-section";
+import { PeriodSelector } from "./_dashboard/period-selector";
+import { PeriodSummary } from "./_dashboard/period-summary";
 
 /**
- * DOC-5 / owner decision (M2.2): the incomes waiting for a receipt, counted from the day the
- * payment was received, with a link to their list, and the monthly receipts counter (DOC-4).
- * A failure to load is shown inside the card; the rest of the home page stays usable.
+ * The home screen is the dashboard (SPEC 5.9, 5.10): the ceiling banners (CEIL-4/5), the
+ * period selector (DASH-1), the tax year's ceiling (CEIL-3/6), the period's measures
+ * (DASH-2), the action cards (DASH-5), the 12-month chart (DASH-3) and the expenses by
+ * category (DASH-4). Lead decision: the ceiling and its banners follow the tax year of the
+ * selected period (the current year by default).
+ *
+ * Every number comes from one database function in one round trip, read in parallel with
+ * the receipt settings. "Today" is todayInJerusalem(): the month and year turn at local
+ * midnight in Israel.
  */
-async function PendingReceiptsCard() {
-  let summary: ReceiptsSummary;
+export default async function HomePage({ searchParams }: PageProps<"/">) {
+  // AUTH-3: every page checks the session itself (see the (app) layout).
+  await requireAllowedUser();
+  const today = todayInJerusalem();
+  const currentMonth = currentMonthPeriod(today);
+  const period = parsePeriod(await searchParams, today);
+
+  let data: DashboardData;
   let settings: ReceiptSettings;
   try {
     const supabase = await createSupabaseServerClient();
-    [summary, settings] = await Promise.all([
-      getReceiptsSummary(supabase),
+    [data, settings] = await Promise.all([
+      getDashboardData(supabase, period, today),
       getReceiptSettings(supabase),
     ]);
   } catch (error) {
-    logDbFailure("home", "read receipts summary", error);
+    // Logged by code only (SPEC 8); the selector stays usable to try again.
+    logDbFailure("dashboard", "read", error);
     return (
-      <section aria-labelledby={PENDING_HEADING_ID} className="space-y-2 rounded-lg border p-4">
-        <h2 id={PENDING_HEADING_ID} className="text-xl font-semibold">
-          קבלות ממתינות
-        </h2>
-        <p className="text-destructive text-sm font-medium">
-          לא הצלחנו לטעון את נתוני הקבלות. אפשר לרענן את הדף ולנסות שוב.
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold">דף הבית</h1>
+        <p className="text-destructive font-medium">
+          לא הצלחנו לטעון את נתוני הדף. אפשר לרענן את הדף ולנסות שוב.
         </p>
-      </section>
+        <PeriodSelector period={period} currentMonth={currentMonth} />
+      </div>
     );
   }
 
+  const status = ceilingStatus(data.ceiling);
+  const label = periodLabel(period);
+
   return (
-    <section
-      aria-labelledby={PENDING_HEADING_ID}
-      className="max-w-xl space-y-3 rounded-lg border p-4"
-    >
-      <h2 id={PENDING_HEADING_ID} className="text-xl font-semibold">
-        קבלות ממתינות
-      </h2>
-      <p>
-        <span aria-hidden="true" className="block text-3xl font-semibold">
-          {summary.pendingCount}
-        </span>
-        <span className="text-sm">{pendingText(summary.pendingCount)}</span>
-      </p>
-      {summary.pendingCount > 0 ? (
-        <Link href={PENDING_RECEIPTS_PATH} className={buttonClasses("primary")}>
-          להכנסות שממתינות לקבלה
-        </Link>
+    <div className="space-y-8">
+      <h1 className="text-2xl font-semibold">דף הבית</h1>
+      {status.state === "set" ? (
+        <CeilingBanners
+          year={status.year}
+          banner={status.banner}
+          exceeded={status.crossed === CEILING_EXCEEDED_PERCENT}
+          percentText={formatCeilingPercent(status.percentTenths)}
+        />
       ) : null}
-      <QuotaNotice issued={summary.issuedThisMonth} quota={settings.monthlyQuota} />
-    </section>
+      <PeriodSelector period={period} currentMonth={currentMonth} />
+      <CeilingProgress status={status} basis={data.ceiling.basis} isAdmin={data.isAdmin} />
+      <PeriodSummary
+        data={data.period}
+        periodLabel={label}
+        previousLabel={previousPeriodLabel(period)}
+      />
+      <ActionCards cards={data.cards} monthlyQuota={settings.monthlyQuota} />
+      <MonthlySection series={data.series} />
+      <CategorySection
+        categories={data.categories}
+        periodTotal={data.period.expense}
+        periodLabel={label}
+      />
+    </div>
   );
 }

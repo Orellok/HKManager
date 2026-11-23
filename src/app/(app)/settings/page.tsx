@@ -3,6 +3,9 @@ import Link from "next/link";
 import { buttonClasses } from "@/components/button";
 import { RedirectNotice } from "@/components/redirect-notice";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { fetchIsAdmin } from "@/lib/auth/roles";
+import { listTaxYearCeilings, type TaxYearCeiling } from "@/lib/ceiling/queries";
+import { todayInJerusalem } from "@/lib/dates";
 import { NEW_CATEGORY_PATH, SETTINGS_NOTICE_MESSAGES } from "@/lib/expense-categories/paths";
 import {
   MAX_EXPENSE_CATEGORIES,
@@ -14,19 +17,31 @@ import { NOTICE_PARAM, noticeMessage } from "@/lib/notices";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { CategoryList } from "./category-list";
+import { CeilingList } from "./ceiling-list";
 
 const CATEGORIES_HEADING_ID = "expense-categories-heading";
 
 /**
  * SPEC 5.14: the settings screen. M3 holds the expense categories (EXP-3; owner decision:
- * both allowlisted users manage them): add, rename, reorder, archive and restore.
+ * both allowlisted users manage them): add, rename, reorder, archive and restore. M4.1 adds
+ * the yearly ceilings (CEIL-1) for the admin only; the owner does not see that section, and
+ * its screens answer her with 404 (requireAdmin()).
  */
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   await requireAllowedUser();
   const notice = noticeMessage(SETTINGS_NOTICE_MESSAGES, (await searchParams)[NOTICE_PARAM]);
   let categories: ExpenseCategory[];
+  let ceilings: TaxYearCeiling[] | null = null;
   try {
-    categories = await listExpenseCategories(await createSupabaseServerClient());
+    const supabase = await createSupabaseServerClient();
+    const [categoryList, isAdmin] = await Promise.all([
+      listExpenseCategories(supabase),
+      fetchIsAdmin(supabase),
+    ]);
+    categories = categoryList;
+    if (isAdmin) {
+      ceilings = await listTaxYearCeilings(supabase);
+    }
   } catch (error) {
     // Logged by code only; the error boundary gets no database details (SPEC 8).
     logDbFailure("expense_categories", "list", error);
@@ -56,6 +71,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </p>
         <CategoryList categories={categories} />
       </section>
+      {ceilings ? (
+        <CeilingList ceilings={ceilings} currentYear={Number(todayInJerusalem().slice(0, 4))} />
+      ) : null}
     </div>
   );
 }

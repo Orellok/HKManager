@@ -427,7 +427,8 @@ test_.describe("criterion 4 / 5: validation and security", () => {
 
       // The Route Handler's address after a failure before the first byte.
       await page.goto("/export?from=2026-01-01&to=2026-12-31&error=failed");
-      await expect(page.getByRole("alert")).toHaveText(
+      // Scoped to the form: Next.js keeps its own (empty) route announcer with role "alert".
+      await expect(page.getByRole("form", { name: "טווח הייצוא" }).getByRole("alert")).toHaveText(
         "הייצוא נכשל ולא נוצר קובץ. אפשר לנסות שוב.",
       );
       await expect(field.from(page)).toHaveValue("2026-01-01");

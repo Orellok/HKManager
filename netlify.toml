@@ -1,0 +1,12 @@
+# Netlify build settings (M0.6). Deploys run from GitHub Actions only
+# (.github/workflows/staging-deploy.yml, production-deploy.yml); the sites are not linked to
+# the repository, so Netlify never builds on its own and creates no deploy previews.
+
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+# Netlify's official Next.js runtime (OpenNext adapter). Pinned exactly in package.json
+# (devDependencies) so every build uses the same version.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

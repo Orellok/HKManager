@@ -20,6 +20,7 @@ Commit and push after every meaningful step.
 - 2026-11-22: owner approved M2.2 deviations and copy (file OR link; receipt-number format; issue date not future; replaced files kept; pending tab across months; direct signed upload).
 - 2026-11-23: owner removed the code-reviewer step: dev → QA → dev fix, max 2 fix rounds (recorded in CLAUDE.md).
 - 2026-11-23: owner pre-approved the lead's recommendations – run autonomously, no waiting for approvals (see CLAUDE.md).
+- 2026-11-23: owner created Netlify sites hkmanager-staging and hkmanager (name available – VERIFY-02 name item closed); Site IDs recorded in docs/setup/environments.md.
 - Owner wants work committed continuously and resumed autonomously after interruptions.
 
 ## Status

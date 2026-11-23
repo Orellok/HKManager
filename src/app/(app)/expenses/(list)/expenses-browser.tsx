@@ -282,7 +282,9 @@ export function ExpensesBrowser({
               aria-describedby="expenses-vendor-hint"
               className={INPUT_CLASSES}
             />
-            <Button type="submit" variant="secondary" disabled={!hydrated} pending={filterPending}>
+            {/* Never `pending`: Enter in a filter submits through this button, and a search made
+                while a load runs is queued, not dropped. */}
+            <Button type="submit" variant="secondary" disabled={!hydrated}>
               חיפוש
             </Button>
           </div>

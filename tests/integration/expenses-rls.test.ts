@@ -42,7 +42,6 @@ const TABLE = "expenses";
 const CATEGORIES = "expense_categories";
 const INSUFFICIENT_PRIVILEGE = "42501";
 const CHECK_VIOLATION = "23514";
-const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
 const MARKER = `it-expenses-${randomUUID()}`;
 /** A month no other test data uses, for the list and summary checks. */

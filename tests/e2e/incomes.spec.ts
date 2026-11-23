@@ -761,7 +761,7 @@ test_.describe("PRJ-3 / CLI-4 / MS-6: balances on the cards and in open debts", 
       await expect(withoutMilestone.getByRole("listitem")).toHaveCount(1);
       await expect(withoutMilestone).toContainText("צ'ק");
       // The payments' edit links, under a milestone and without one, are 44×44 touch targets.
-      const editLinks = page.getByRole("link", { name: /^עריכת (תשלום|הכנסה) מ-/ });
+      const editLinks = page.getByRole("link", { name: /^עריכה: (תשלום|הכנסה) מ-/ });
       await expect(editLinks).toHaveCount(2);
       for (const link of await editLinks.all()) {
         const box = (await link.boundingBox())!;

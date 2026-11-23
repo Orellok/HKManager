@@ -402,36 +402,48 @@ test_.describe("CLI-4: client card", () => {
 });
 
 test_.describe("M1.1-8: navigation", () => {
-  test_("M1.1-8: shows only existing screens and marks the current item", async ({ page }) => {
-    await page.goto("/");
-    const nav = page.getByRole("navigation", { name: "ניווט ראשי" });
+  test_(
+    "M1.1-8 / M3-9: shows only existing screens and marks the current item",
+    async ({ page }, testInfo) => {
+      await page.goto("/");
+      const nav = page.getByRole("navigation", { name: "ניווט ראשי" });
+      const isMobile = testInfo.project.name === "android";
 
-    // PRJ-1 (M1.2) adds פרויקטים; owner decisions add חובות (M1.3) and הכנסות (M2.1).
-    await expect(nav.getByRole("link")).toHaveText([
-      "בית",
-      "לקוחות",
-      "פרויקטים",
-      "חובות",
-      "הכנסות",
-    ]);
-    await expect(nav.getByRole("link", { name: "בית" })).toHaveAttribute("aria-current", "page");
-    await expect(nav.getByRole("link", { name: "לקוחות" })).not.toHaveAttribute(
-      "aria-current",
-      /.*/,
-    );
+      // PRJ-1 (M1.2) adds פרויקטים; owner decisions add חובות (M1.3), הכנסות (M2.1), and in M3
+      // הוצאות and הגדרות, which on mobile sit behind "עוד" with חובות.
+      await expect(nav.getByRole("link")).toHaveText(
+        isMobile
+          ? ["בית", "לקוחות", "פרויקטים", "הכנסות"]
+          : ["בית", "לקוחות", "פרויקטים", "הכנסות", "חובות", "הוצאות", "הגדרות"],
+      );
+      await expect(nav.getByRole("button", { name: "עוד" })).toHaveCount(isMobile ? 1 : 0);
+      await expect(nav.getByRole("link", { name: "בית" })).toHaveAttribute("aria-current", "page");
+      await expect(nav.getByRole("link", { name: "לקוחות" })).not.toHaveAttribute(
+        "aria-current",
+        /.*/,
+      );
 
-    await nav.getByRole("link", { name: "לקוחות" }).click();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("לקוחות");
-    await expect(nav.getByRole("link", { name: "לקוחות" })).toHaveAttribute("aria-current", "page");
+      await nav.getByRole("link", { name: "לקוחות" }).click();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("לקוחות");
+      await expect(nav.getByRole("link", { name: "לקוחות" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
 
-    await page.goto("/clients/new");
-    await expect(nav.getByRole("link", { name: "לקוחות" })).toHaveAttribute("aria-current", "page");
-    // Not by color alone: the current item is bold.
-    const weights = await nav
-      .getByRole("link")
-      .evaluateAll((links) => links.map((link) => getComputedStyle(link).fontWeight));
-    expect(weights).toEqual(["400", "700", "400", "400", "400"]);
-  });
+      await page.goto("/clients/new");
+      await expect(nav.getByRole("link", { name: "לקוחות" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      // Not by color alone: the current item is bold.
+      const weights = await nav
+        .getByRole("link")
+        .evaluateAll((links) => links.map((link) => getComputedStyle(link).fontWeight));
+      expect(weights).toEqual(
+        isMobile ? ["400", "700", "400", "400"] : ["400", "700", "400", "400", "400", "400", "400"],
+      );
+    },
+  );
 
   test_(
     "M1.1-8: bottom navigation on mobile, side navigation on desktop, 44px targets",
@@ -450,8 +462,12 @@ test_.describe("M1.1-8: navigation", () => {
         expect(navBox.x).toBeGreaterThanOrEqual(mainBox.x + mainBox.width - 1);
         expect(navBox.height).toBeGreaterThan(navBox.width);
       }
-      for (const link of await nav.getByRole("link").all()) {
-        const box = (await link.boundingBox())!;
+      const controls = [
+        ...(await nav.getByRole("link").all()),
+        ...(await nav.getByRole("button").all()),
+      ];
+      for (const control of controls) {
+        const box = (await control.boundingBox())!;
         expect(box.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
       }
     },

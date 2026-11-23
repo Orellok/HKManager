@@ -186,7 +186,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                 </span>
                 <Link
                   href={payment.editHref}
-                  aria-label={`עריכת הכנסה מ-${payment.receivedDate} על סך ${payment.amount}`}
+                  aria-label={`עריכה: הכנסה מ-${payment.receivedDate} על סך ${payment.amount}`}
                   className="inline-flex min-h-11 min-w-11 items-center justify-center underline underline-offset-4"
                 >
                   עריכה

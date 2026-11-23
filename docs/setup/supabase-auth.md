@@ -21,10 +21,10 @@
    | | Site URL | Redirect URLs |
    |---|---|---|
    | production | `https://hkmanager.netlify.app` | `https://hkmanager.netlify.app/auth/callback` |
-   | staging | כתובת ה-staging של Netlify (ייקבע ב-M0.4) | `<staging URL>/auth/callback` (וכתובות deploy previews אם יוחלט עליהן ב-M0.4) |
+   | staging | `https://hkmanager-staging.netlify.app` | `https://hkmanager-staging.netlify.app/auth/callback` (אין deploy previews – `docs/setup/deploy.md`) |
 
    כתובת ה-production כפופה ל-VERIFY-02. אין להוסיף `localhost` לפרויקט production.
-6. **משתני סביבה ב-Netlify (M0.4):** `NEXT_PUBLIC_SUPABASE_URL` ו-`NEXT_PUBLIC_SUPABASE_ANON_KEY` של הפרויקט המתאים. ה-service role key אינו נדרש לאפליקציה בשלב זה.
+6. **הכתובת והמפתח הציבורי לפריסה (M0.6):** מוגדרים כמשתנים ב-GitHub, לא ב-Netlify – ראו `docs/setup/deploy.md`. ה-service role key אינו נדרש לאפליקציה בשלב זה.
 
 ## בדיקה ידנית אחרי ההגדרה (לכל סביבה)
 1. כניסה עם חשבון Google שב-allowlist → מגיעים ל"דף הבית", ובכותרת מופיע "יציאה".

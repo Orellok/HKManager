@@ -29,7 +29,5 @@
 2. ב-GitHub: Settings → Secrets and variables → Actions → New repository secret: שם `NETLIFY_AUTH_TOKEN`, ערך – הטוקן.
 3. **לא להדביק את הטוקן בצ'אט.**
 
-## 5. מה יגיע אחר כך (ב-M0.6)
-- משתני סביבה לכל אתר (כתובת Supabase והמפתח הציבורי של הסביבה המתאימה) – יוגדרו ב-workflow או ב-Netlify לפי הקריטריונים שיאושרו.
-- עדכון Site URL ו-Redirect URLs ב-Supabase ובלקוחות Google OAuth לכתובות הסופיות.
-- בדיקת הפריסה הראשונה ל-staging: כניסה, "אין הרשאה" ו-headers אבטחה. ראו `docs/verify/VERIFY-02-netlify.md`.
+## 5. השלב הבא
+הגדרת הפריסה עצמה (משתנים ב-GitHub, כתובות ב-Supabase וב-Google, ובדיקות אחרי הפריסה הראשונה): `docs/setup/deploy.md`.

@@ -1,0 +1,222 @@
+name: Staging deploy
+
+# Runs only after the staging migrations workflow succeeded for a commit on main, and deploys
+# that exact commit to the staging Netlify site (M0.6). Netlify's Git integration is not used:
+# the sites are not linked to the repository, so there are no deploy previews or branch deploys.
+on:
+  workflow_run:
+    workflows: [Staging migrations]
+    types: [completed]
+    branches: [main]
+
+# The production deploy workflow finds the staging deploy for a commit by this title. Keep the
+# format in sync with the guard in production-deploy.yml.
+run-name: Staging deploy ${{ github.event.workflow_run.head_sha }}
+
+permissions:
+  contents: read
+
+# Deploys never overlap; a newer queued run replaces an older queued one.
+concurrency:
+  group: netlify-deploy-staging
+  cancel-in-progress: false
+
+# bash -eo pipefail: a failing command anywhere in a pipeline fails the step.
+defaults:
+  run:
+    shell: bash
+
+env:
+  NETLIFY_CLI_VERSION: 27.20.1
+  NETLIFY_TELEMETRY_DISABLED: "true"
+  # The staging Supabase project (docs/setup/environments.md). The public URL variable must
+  # point here, so the staging site can never be built against production.
+  EXPECTED_SUPABASE_URL: https://tmistmqyqcnjftovxyoy.supabase.co
+
+jobs:
+  # A separate job, so that a commit that is not deployed leaves the deploy job "skipped"
+  # rather than "success": the production guard counts only a deploy job that succeeded.
+  check-ready:
+    name: Check that the commit is ready for a staging deploy
+    # Only a successful staging migrations run (itself only started by CI for a push to this
+    # repository's main branch). A run for a branch called "main" in a fork does not count.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      is-ready: ${{ steps.ready.outputs.is-ready }}
+    steps:
+      # A staging migrations run can conclude "success" while its migrate job was skipped (CI
+      # failed, or main had moved on), so the migrate job itself must have succeeded. If main
+      # has moved on since, the newer commit's own run deploys. Any API error fails this step.
+      - name: Require successful staging migrations for the head of main
+        id: ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          MIGRATIONS_RUN_ID: ${{ github.event.workflow_run.id }}
+          # The name of the migrate job in staging-migrations.yml; keep the two in sync.
+          MIGRATE_JOB_NAME: Apply migrations to staging
+        run: |
+          if ! [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ && "$MIGRATIONS_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::Unexpected commit SHA or run id in the workflow_run event"
+            exit 1
+          fi
+          migrate_jobs=$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$MIGRATIONS_RUN_ID/jobs?per_page=100" \
+            --jq ".jobs[] | select(.name == \"$MIGRATE_JOB_NAME\" and .conclusion == \"success\") | .id")
+          if [ -z "$migrate_jobs" ]; then
+            echo "::notice::Skipping: the staging migrations were not applied for $COMMIT_SHA in run $MIGRATIONS_RUN_ID."
+            echo "is-ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          main_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          if [ "$main_sha" != "$COMMIT_SHA" ]; then
+            echo "::notice::Skipping: $COMMIT_SHA is no longer the head of main ($main_sha); that commit's run deploys."
+            echo "is-ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "is-ready=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    # The production guard matches this exact job name.
+    name: Deploy to staging
+    needs: check-ready
+    if: needs.check-ready.outputs.is-ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+      NETLIFY_SITE_ID: ${{ vars.NETLIFY_STAGING_SITE_ID }}
+      # Unique per run attempt; used to find this deploy through the Netlify API.
+      DEPLOY_MESSAGE: GitHub Actions run ${{ github.run_id }}.${{ github.run_attempt }} for ${{ github.event.workflow_run.head_sha }}
+    steps:
+      # Prints only the names of missing or wrong settings, never their values.
+      - name: Check the deploy settings
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          failed=0
+          fail() {
+            echo "::error::$1 (docs/setup/deploy.md)"
+            failed=1
+          }
+          [ -n "$NETLIFY_AUTH_TOKEN" ] || fail "The NETLIFY_AUTH_TOKEN secret is not set"
+          if [ -z "$NETLIFY_SITE_ID" ]; then
+            fail "The NETLIFY_STAGING_SITE_ID variable is not set"
+          elif ! [[ "$NETLIFY_SITE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+            fail "The NETLIFY_STAGING_SITE_ID variable is not a Netlify Site ID"
+          fi
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
+            fail "The STAGING_NEXT_PUBLIC_SUPABASE_URL variable is not set"
+          elif [ "$NEXT_PUBLIC_SUPABASE_URL" != "$EXPECTED_SUPABASE_URL" ]; then
+            fail "The STAGING_NEXT_PUBLIC_SUPABASE_URL variable must be $EXPECTED_SUPABASE_URL"
+          fi
+          # The key is built into the browser bundle, so it must be the public (anon or
+          # publishable) key. A service role or secret key here would be published.
+          key="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+          if [ -z "$key" ]; then
+            fail "The STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY variable is not set"
+          elif [[ "$key" != sb_publishable_* ]]; then
+            payload=""
+            if [[ "$key" =~ ^[A-Za-z0-9_-]+\.([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+$ ]]; then
+              payload=$(printf '%s' "${BASH_REMATCH[1]}" | tr '_-' '/+')
+              while (( ${#payload} % 4 )); do payload+="="; done
+            fi
+            role=$(printf '%s' "$payload" | base64 --decode 2>/dev/null | jq -r '.role // empty' 2>/dev/null || true)
+            [ "$role" = "anon" ] || fail "The STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY variable is not a public anon or publishable key"
+          fi
+          exit "$failed"
+
+      - name: Check out the commit that passed the staging migrations
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Builds with netlify.toml (pnpm build + the Next.js runtime) and uploads a draft deploy;
+      # the live site does not change until the smoke checks pass. The public Supabase values
+      # are built into the app. The CLI's build and deploy run in one process (the runtime's
+      # output exists only between them), so the token is present during the build.
+      - name: Build and upload a draft deploy
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: >-
+          npx --yes "netlify-cli@$NETLIFY_CLI_VERSION" deploy
+          --site "$NETLIFY_SITE_ID" --message "$DEPLOY_MESSAGE"
+
+      - name: Find the draft deploy
+        id: draft
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          deploys=$(npx --yes "netlify-cli@$NETLIFY_CLI_VERSION" api listSiteDeploys \
+            --data "$(jq -cn --arg site_id "$NETLIFY_SITE_ID" '{site_id: $site_id, per_page: 20}')")
+          matches=$(jq -c --arg title "$DEPLOY_MESSAGE" \
+            '[.[] | select(.title == $title and .state == "ready") | {id, url: .deploy_ssl_url}]' <<<"$deploys")
+          if [ "$(jq length <<<"$matches")" != "1" ]; then
+            echo "::error::Expected exactly one ready deploy titled \"$DEPLOY_MESSAGE\""
+            exit 1
+          fi
+          deploy_id=$(jq -r '.[0].id' <<<"$matches")
+          deploy_url=$(jq -r '.[0].url' <<<"$matches")
+          if ! [[ "$deploy_id" =~ ^[0-9a-f]{24}$ && "$deploy_url" =~ ^https://[0-9a-f]{24}--[a-z0-9-]+\.netlify\.app$ ]]; then
+            echo "::error::Unexpected deploy id or URL from the Netlify API"
+            exit 1
+          fi
+          echo "Draft deploy $deploy_id: $deploy_url"
+          echo "deploy-id=$deploy_id" >> "$GITHUB_OUTPUT"
+          echo "deploy-url=$deploy_url" >> "$GITHUB_OUTPUT"
+
+      # VERIFY-02 gate: proves on the real host that src/proxy.ts runs (login redirect, nonce
+      # CSP, prefetch protection) and that indexing is blocked. A failure leaves the live site
+      # unchanged.
+      - name: Smoke check the draft deploy
+        env:
+          DEPLOY_URL: ${{ steps.draft.outputs.deploy-url }}
+        run: node scripts/smoke-deploy.mts "$DEPLOY_URL"
+
+      - name: Publish the deploy to the staging site
+        id: publish
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          DEPLOY_ID: ${{ steps.draft.outputs.deploy-id }}
+        run: |
+          npx --yes "netlify-cli@$NETLIFY_CLI_VERSION" api restoreSiteDeploy \
+            --data "$(jq -cn --arg site_id "$NETLIFY_SITE_ID" --arg deploy_id "$DEPLOY_ID" \
+              '{site_id: $site_id, deploy_id: $deploy_id}')" > /dev/null
+          site_url=$(npx --yes "netlify-cli@$NETLIFY_CLI_VERSION" api getSite \
+            --data "$(jq -cn --arg site_id "$NETLIFY_SITE_ID" '{site_id: $site_id}')" | jq -r .ssl_url)
+          if ! [[ "$site_url" =~ ^https://[a-z0-9.-]+$ ]]; then
+            echo "::error::Unexpected site URL from the Netlify API"
+            exit 1
+          fi
+          echo "Published deploy $DEPLOY_ID to $site_url"
+          echo "site-url=$site_url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke check the live staging site
+        env:
+          SITE_URL: ${{ steps.publish.outputs.site-url }}
+        run: node scripts/smoke-deploy.mts "$SITE_URL"

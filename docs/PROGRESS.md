@@ -46,6 +46,7 @@ Commit and push after every meaningful step.
 Resumed by owner 2026-11-22; scheduled task re-enabled by owner request.
 
 ## Next step
+Staging LIVE 2026-11-23: deploy 80ec1af published to https://hkmanager-staging.netlify.app (run 45272076850). Post-publish smoke: all PASS (incl. X-Robots-Tag) except Netlify-injected /.netlify/scripts/hud script without nonce (blocked by CSP) → hotfix branch claude/fix-smoke-netlify-hud in progress. Owner made repo public 2026-11-23 (Actions minutes).
 Actions minutes (2026-11-23): owner hit GitHub Free 2000-min limit. Lead decision (owner pre-approved): CI on push to main + pull_request only (docs-only PRs skipped); agents run full checks locally before PR. Staging deploy for 80ec1af pending until minutes available (owner choice: public repo / pay / wait for reset).
 Owner actions pending: (1) answer whether any migrations were applied manually to staging/prod; (2) create 3 GitHub secrets (docs/setup/github-secrets.md); (3) Google OAuth clients (docs/setup/google-oauth.md); (4) open PR claude/adoring-rubin-yrdzla -> main when ready (first real staging migration run); (5) Netlify account + 2 sites + NETLIFY_AUTH_TOKEN (docs/setup/netlify.md).
 VERIFY-02 checked 2026-11-16 (docs/verify/VERIFY-02-netlify.md): commercial use OK, Next 16 supported; OPEN: proxy.ts (Node runtime) on Netlify – gate on first staging deploy; credit budget (hard pause).

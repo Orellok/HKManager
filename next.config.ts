@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+import { SERVICE_WORKER_HEADERS } from "./src/lib/pwa/headers";
 import { STATIC_SECURITY_HEADERS } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
@@ -7,7 +8,10 @@ const nextConfig: NextConfig = {
   // page to render dynamically (owner decision, M0.1).
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: [...STATIC_SECURITY_HEADERS] }];
+    return [
+      { source: "/:path*", headers: [...STATIC_SECURITY_HEADERS] },
+      { source: "/sw.js", headers: [...SERVICE_WORKER_HEADERS] },
+    ];
   },
   turbopack: {
     rules: {

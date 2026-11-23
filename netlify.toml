@@ -23,3 +23,11 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Frame-Options = "DENY"
     Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()"
+
+# M7.1-5: the service worker is always revalidated and may control the whole app. Must match
+# SERVICE_WORKER_HEADERS in src/lib/pwa/headers.ts (enforced by src/lib/netlify-headers.test.ts).
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"

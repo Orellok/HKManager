@@ -1,4 +1,5 @@
 import { noticeMessage } from "@/lib/notices";
+import { TASK_NOTICE_MESSAGES } from "@/lib/tasks/notices";
 
 import type { ClientNotice } from "./paths";
 import type { DuplicateClient } from "./queries";
@@ -12,6 +13,8 @@ export const CLIENT_NOTICE_MESSAGES: Record<ClientNotice, string> = {
   updated_duplicate: "השינויים נשמרו. שימו לב: כבר קיים לקוח נוסף בשם הזה.",
   updated_duplicate_archived: "השינויים נשמרו. שימו לב: בארכיון כבר יש לקוח בשם הזה.",
   deleted: "הלקוח נמחק.",
+  // TASK-8: a task saved or deleted from the client card returns here.
+  ...TASK_NOTICE_MESSAGES,
 };
 
 /** The message for a `?notice=` value, or undefined for a missing or unknown code. */

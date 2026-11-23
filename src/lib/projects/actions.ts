@@ -51,7 +51,8 @@ const MESSAGES = {
   restored: "הפרויקט הוחזר מהארכיון.",
   statusFailed: "הפעולה נכשלה. אפשר לנסות שוב.",
   deleteFailed: "המחיקה נכשלה. אפשר לנסות שוב.",
-  deleteReferenced: "אי אפשר למחוק פרויקט שיש לו אבני דרך או הכנסות. אפשר להעביר אותו לארכיון.",
+  deleteReferenced:
+    "אי אפשר למחוק פרויקט שיש לו אבני דרך, הכנסות או משימות. אפשר להעביר אותו לארכיון.",
 } as const;
 
 function refusedState(values: ProjectFormValues, refusal: ClientRefusal): ProjectFormState {

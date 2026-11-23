@@ -1,4 +1,5 @@
 import { ARCHIVED_VIEW, VIEW_PARAM } from "@/lib/list-view";
+import { TASK_NOTICE_MESSAGES, type TaskNotice } from "@/lib/tasks/notices";
 
 /** Routes of the projects screens. Only ids (never names) go into a URL (SPEC 8). */
 
@@ -32,7 +33,8 @@ export type ProjectNotice =
   | "milestone_updated"
   | "income_created"
   | "income_updated"
-  | "income_deleted";
+  | "income_deleted"
+  | TaskNotice;
 
 export const PROJECT_NOTICE_MESSAGES: Record<ProjectNotice, string> = {
   created: "הפרויקט נשמר.",
@@ -43,4 +45,6 @@ export const PROJECT_NOTICE_MESSAGES: Record<ProjectNotice, string> = {
   income_created: "התשלום נרשם.",
   income_updated: "השינויים בתשלום נשמרו.",
   income_deleted: "התשלום נמחק.",
+  // TASK-8: a task saved or deleted from the project card returns here.
+  ...TASK_NOTICE_MESSAGES,
 };

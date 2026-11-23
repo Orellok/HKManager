@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 
+import { BADGE_DISPLAY_MAX, badgeDisplayText, badgeSpokenSuffix } from "@/lib/tasks/grouping";
+import { CALENDAR_PATH, TASKS_PATH } from "@/lib/tasks/paths";
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string };
+type NavItem = { href: string; label: string; badge?: "tasks" };
 
 /**
  * Owner decision (M3): the mobile bottom bar holds these, then "עוד" with MORE_ITEMS; the
@@ -20,6 +22,9 @@ const PRIMARY_ITEMS: readonly NavItem[] = [
 ];
 
 const MORE_ITEMS: readonly NavItem[] = [
+  // TASK-6 with the NOTIF-1 badge, and the in-app calendar (CAL-11), M6.
+  { href: TASKS_PATH, label: "משימות", badge: "tasks" },
+  { href: CALENDAR_PATH, label: "יומן" },
   // Owner decision (M1.3): the open debts screen (MS-6).
   { href: "/debts", label: "חובות" },
   // EXP-4.
@@ -42,14 +47,38 @@ const ITEM_CLASSES =
 const CURRENT_CLASSES =
   "text-foreground font-bold before:bg-primary before:absolute before:inset-x-2 before:top-0 before:h-1 before:rounded-b-sm md:bg-accent md:before:inset-x-auto md:before:inset-y-2 md:before:start-0 md:before:h-auto md:before:w-1 md:before:rounded-sm";
 
+/**
+ * NOTIF-1: the number of tasks to handle, as a pill next to a label. The digits are hidden
+ * from screen readers, which hear the label's suffix instead (e.g. "משימות, 3 לטיפול"), so
+ * the accessible name starts with the visible label. Nothing for 0.
+ */
+function Badge({ count, kind }: { count: number; kind: "tasks" | "more" }) {
+  if (count <= 0) {
+    return null;
+  }
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        title={count > BADGE_DISPLAY_MAX ? String(count) : undefined}
+        className="bg-destructive text-destructive-foreground ms-1.5 inline-flex min-w-6 items-center justify-center rounded-full px-1.5 text-xs leading-5 font-bold"
+      >
+        {badgeDisplayText(count)}
+      </span>
+      <span className="sr-only">{badgeSpokenSuffix(count, kind)}</span>
+    </>
+  );
+}
+
 type NavLinkProps = {
   item: NavItem;
   current: boolean;
+  tasksBadge: number;
   className?: string;
   onClick?: () => void;
 };
 
-function NavLink({ item, current, className, onClick }: NavLinkProps) {
+function NavLink({ item, current, tasksBadge, className, onClick }: NavLinkProps) {
   return (
     <Link
       href={item.href}
@@ -58,6 +87,7 @@ function NavLink({ item, current, className, onClick }: NavLinkProps) {
       className={cn(ITEM_CLASSES, current ? CURRENT_CLASSES : "text-muted-foreground", className)}
     >
       {item.label}
+      {item.badge === "tasks" ? <Badge count={tasksBadge} kind="tasks" /> : null}
     </Link>
   );
 }
@@ -69,8 +99,11 @@ function NavLink({ item, current, className, onClick }: NavLinkProps) {
  * (aria-current="true") while one of them is the current screen. Escape or a click outside
  * closes it and returns focus to the button; moving focus out of it (Tab) or opening another
  * screen closes it.
+ *
+ * NOTIF-1: `tasksBadge` (overdue + today's open tasks, from the server on every load) shows
+ * on "משימות" and, on mobile, on "עוד" too, which holds it.
  */
-export function AppNav() {
+export function AppNav({ tasksBadge }: { tasksBadge: number }) {
   const pathname = usePathname();
   const menuId = useId();
   // Open only on the screen it was opened on, so navigating closes it without an effect.
@@ -117,12 +150,12 @@ export function AppNav() {
       <ul className="flex md:flex-col md:gap-1 md:px-4 md:py-6">
         {PRIMARY_ITEMS.map((item) => (
           <li key={item.href} className="flex-1 md:flex-none">
-            <NavLink item={item} current={isCurrent(pathname, item.href)} />
+            <NavLink item={item} current={isCurrent(pathname, item.href)} tasksBadge={tasksBadge} />
           </li>
         ))}
         {MORE_ITEMS.map((item) => (
           <li key={item.href} className="hidden md:block">
-            <NavLink item={item} current={isCurrent(pathname, item.href)} />
+            <NavLink item={item} current={isCurrent(pathname, item.href)} tasksBadge={tasksBadge} />
           </li>
         ))}
         <li
@@ -145,6 +178,7 @@ export function AppNav() {
             )}
           >
             {MORE_LABEL}
+            <Badge count={tasksBadge} kind="more" />
           </button>
           <ul
             id={menuId}
@@ -156,6 +190,7 @@ export function AppNav() {
                 <NavLink
                   item={item}
                   current={isCurrent(pathname, item.href)}
+                  tasksBadge={tasksBadge}
                   onClick={() => setOpenOn(null)}
                   className="min-h-11 justify-start rounded-md px-4 before:inset-x-auto before:inset-y-2 before:start-0 before:top-auto before:h-auto before:w-1 before:rounded-sm"
                 />

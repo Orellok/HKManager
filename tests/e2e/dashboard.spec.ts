@@ -311,8 +311,9 @@ test_.describe("DASH-1..5: the dashboard", () => {
       await expect(cards.getByRole("region", { name: "קבלות ממתינות" })).toBeVisible();
       const missing = cards.getByRole("region", { name: "הוצאות ללא מסמך" });
       await expect(missing).toContainText(/(הוצאה אחת|\d+ הוצאות) החודש בלי מסמך\./);
-      // DASH-5: no placeholder cards for today's events and tasks before M5/M6.
-      await expect(page.getByText(/אירועי היום|משימות/)).toHaveCount(0);
+      // DASH-5: the tasks card came with M6; no placeholder for today's events before M5.
+      await expect(cards.getByRole("region", { name: "משימות", exact: true })).toBeVisible();
+      await expect(page.getByText(/אירועי היום/)).toHaveCount(0);
 
       await missing.getByRole("link", { name: "להוצאות החודש שחסר להן מסמך" }).click();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("הוצאות");

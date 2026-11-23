@@ -1,4 +1,5 @@
 import { ARCHIVED_VIEW, VIEW_PARAM } from "@/lib/list-view";
+import type { TaskNotice } from "@/lib/tasks/notices";
 
 /** Routes of the clients screens. Only ids (never names or phones) go into a URL (SPEC 8). */
 
@@ -24,4 +25,5 @@ export type ClientNotice =
   | "updated"
   | "updated_duplicate"
   | "updated_duplicate_archived"
-  | "deleted";
+  | "deleted"
+  | TaskNotice;

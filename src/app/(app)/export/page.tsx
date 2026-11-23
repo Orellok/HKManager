@@ -1,4 +1,5 @@
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { isIsoDate } from "@/lib/dates";
 import {
   ERROR_PARAM,
   EXPORT_MESSAGES,
@@ -13,6 +14,15 @@ import { ExportForm } from "./export-form";
 
 function stringParam(value: string | string[] | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * M6 criterion 12: a date input accepts only "YYYY-MM-DD" (anything else is dropped with a
+ * console warning), so a malformed echoed value is not given to it; its error still shows.
+ */
+function inputValue(value: string): string {
+  const trimmed = value.trim();
+  return isIsoDate(trimmed) ? trimmed : "";
 }
 
 /**
@@ -43,7 +53,7 @@ export default async function ExportPage({ searchParams }: PageProps<"/export">)
       <ExportForm
         // Another address (the server sent the user back) starts the form afresh.
         key={`${values.from}|${values.to}|${failed}`}
-        initialValues={values}
+        initialValues={{ from: inputValue(values.from), to: inputValue(values.to) }}
         initialErrors={validation && !validation.ok ? validation.errors : {}}
         initialFormError={failed ? EXPORT_MESSAGES.failed : null}
       />

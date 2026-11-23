@@ -86,12 +86,24 @@ describe("criterion 4 / 5: the export Route Handler response", () => {
     expect(exportPages).not.toHaveBeenCalled();
   });
 
-  it("criterion 5: only date-sized values are echoed back", async () => {
+  it("criterion 5: only date-sized values are echoed back (an ISO date plus one character)", async () => {
     const response = await exportCsvResponse(
       new Request(`${BASE}/export/incomes?from=${"x".repeat(500)}`),
       "incomes",
     );
-    expect(response.headers.get("location")).toBe(`${BASE}/export?from=xxxxxxxxxx&to=`);
+    expect(response.headers.get("location")).toBe(`${BASE}/export?from=xxxxxxxxxxx&to=`);
+  });
+
+  it("M6 criterion 12: an over-long hand-made date is never cut into a valid date", async () => {
+    const response = await exportCsvResponse(
+      new Request(`${BASE}/export/incomes?from=2026-01-0199&to=2026-12-31`),
+      "incomes",
+    );
+    expect(response.status).toBe(303);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.searchParams.get("from")).toBe("2026-01-019");
+    expect(location.searchParams.get("to")).toBe("2026-12-31");
+    expect(exportPages).not.toHaveBeenCalled();
   });
 
   it("criterion 5: a failure before the first byte returns to the screen with error=failed", async () => {

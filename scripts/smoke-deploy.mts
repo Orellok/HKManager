@@ -9,7 +9,9 @@
  *   with a new nonce on every request. Scripts the host injects from /.netlify/scripts/ (the
  *   Netlify HUD on published deploys) are reported as warnings, not failures, as long as the CSP
  *   uses 'strict-dynamic' and names no Netlify source, so browsers block them;
- * - prefetch-style requests to / get a redirect, not page content.
+ * - prefetch-style requests to / get a redirect, not page content;
+ * - the PWA files (M7.1-5) are served without a session: /manifest.webmanifest as JSON naming
+ *   HKManager, /sw.js as JavaScript.
  *
  * Usage: node scripts/smoke-deploy.mts <base URL>   (exit 0: all passed, 1: a check failed,
  * 2: bad usage). It sends no credentials and prints no header values other than those checked.
@@ -19,6 +21,9 @@ import { pathToFileURL } from "node:url";
 const LOGIN_PATH = "/login";
 const HOME_PATH = "/";
 const ROBOTS_PATH = "/robots.txt";
+const MANIFEST_PATH = "/manifest.webmanifest";
+const SERVICE_WORKER_PATH = "/sw.js";
+const APP_NAME = "HKManager";
 /** The home page heading; it must never reach a visitor without a session. */
 const HOME_PAGE_MARKER = "דף הבית";
 const REQUIRED_ROBOTS_DIRECTIVES = ["noindex", "nofollow"] as const;
@@ -44,7 +49,7 @@ export type SmokeOptions = {
   timeoutMs?: number;
 };
 
-type FetchedPage = { label: string; status: number; headers: Headers; body: string };
+export type FetchedPage = { label: string; status: number; headers: Headers; body: string };
 
 /** The origin of an http(s) base URL. Anything with a path, query or credentials is refused. */
 export function parseBaseUrl(input: string | undefined): URL {
@@ -249,6 +254,36 @@ function checkLoginCsp(
   return undefined;
 }
 
+/** M7.1-5: the manifest is served without a session, as JSON, for the app HKManager. */
+export function checkManifest(page: FetchedPage): string | undefined {
+  if (page.status !== 200) {
+    return `expected 200, got ${page.status}`;
+  }
+  const contentType = page.headers.get("content-type") ?? "";
+  if (!/json/i.test(contentType)) {
+    return `expected a JSON content type, got "${truncate(contentType)}"`;
+  }
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(page.body);
+  } catch {
+    return "the body is not JSON";
+  }
+  const name = (manifest as { name?: unknown } | null)?.name;
+  return name === APP_NAME ? undefined : `expected name "${APP_NAME}"`;
+}
+
+/** M7.1-5: the service worker script is served without a session, as JavaScript. */
+export function checkServiceWorker(page: FetchedPage): string | undefined {
+  if (page.status !== 200) {
+    return `expected 200, got ${page.status}`;
+  }
+  const contentType = page.headers.get("content-type") ?? "";
+  return /javascript/i.test(contentType)
+    ? undefined
+    : `expected a JavaScript content type, got "${truncate(contentType)}"`;
+}
+
 /** Runs every check; network errors fail the check they belong to and never throw. */
 export async function runSmokeChecks(
   baseUrl: URL,
@@ -310,6 +345,14 @@ export async function runSmokeChecks(
       ),
     );
   }
+
+  await check(`${MANIFEST_PATH} is served without a session`, async () =>
+    checkManifest(await get(MANIFEST_PATH, `GET ${MANIFEST_PATH}`)),
+  );
+
+  await check(`${SERVICE_WORKER_PATH} is served without a session`, async () =>
+    checkServiceWorker(await get(SERVICE_WORKER_PATH, `GET ${SERVICE_WORKER_PATH}`)),
+  );
 
   const missingRobotsTag = fetched
     .filter((page) => !hasRequiredRobotsDirectives(page.headers.get("x-robots-tag")))

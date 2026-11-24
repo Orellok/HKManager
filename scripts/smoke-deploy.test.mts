@@ -30,6 +30,10 @@ type SiteBehaviour = {
   scriptSources: (nonce: string) => string;
   /** Extra markup in the /login head, e.g. a script the host injects. */
   extraHeadHtml: string;
+  /** M7.1-5: the PWA files answer without a session (false: redirected to /login). */
+  servePwaFiles: boolean;
+  manifestBody: string;
+  serviceWorkerType: string;
 };
 
 const NETLIFY_HUD_SCRIPT =
@@ -46,6 +50,9 @@ const HEALTHY: SiteBehaviour = {
   scriptNonce: (n) => `nonce${n}`,
   scriptSources: (nonce) => `'self' 'nonce-${nonce}' 'strict-dynamic'`,
   extraHeadHtml: "",
+  servePwaFiles: true,
+  manifestBody: JSON.stringify({ name: "HKManager", short_name: "HKManager" }),
+  serviceWorkerType: "application/javascript; charset=UTF-8",
 };
 
 let server: Server | undefined;
@@ -74,6 +81,17 @@ async function startSite(overrides: Partial<SiteBehaviour> = {}): Promise<URL> {
       response.writeHead(307, { Location: "/login", ...proxyHeaders }).end();
     } else if (request.url === "/") {
       response.end("<html><body><h1>דף הבית</h1></body></html>");
+    } else if (
+      !site.servePwaFiles &&
+      (request.url === "/manifest.webmanifest" || request.url === "/sw.js")
+    ) {
+      response.writeHead(307, { Location: "/login" }).end();
+    } else if (request.url === "/manifest.webmanifest") {
+      response
+        .writeHead(200, { "Content-Type": "application/manifest+json" })
+        .end(site.manifestBody);
+    } else if (request.url === "/sw.js") {
+      response.writeHead(200, { "Content-Type": site.serviceWorkerType }).end("self.x = 1;");
     } else if (request.url === "/login") {
       loginRequests += 1;
       const cspNonce = site.cspNonce(loginRequests);
@@ -108,7 +126,32 @@ describe("M0.6-4: post-deploy smoke checks", () => {
     const results = await runSmokeChecks(await startSite());
 
     expect(failures(results)).toEqual([]);
-    expect(results).toHaveLength(7);
+    expect(results).toHaveLength(9);
+  });
+
+  it("M7.1-5: fails when the PWA files need a session", async () => {
+    const results = await runSmokeChecks(await startSite({ servePwaFiles: false }));
+
+    expect(failures(results)).toEqual([
+      "/manifest.webmanifest is served without a session",
+      "/sw.js is served without a session",
+    ]);
+    expect(results.find((r) => !r.ok)?.detail).toBe("expected 200, got 307");
+  });
+
+  it("M7.1-5: fails when the manifest is not JSON for HKManager", async () => {
+    for (const manifestBody of ["<html></html>", JSON.stringify({ name: "Other" }), "null"]) {
+      const results = await runSmokeChecks(await startSite({ manifestBody }));
+      expect(failures(results)).toEqual(["/manifest.webmanifest is served without a session"]);
+      await new Promise<void>((resolve) => server!.close(() => resolve()));
+      server = undefined;
+    }
+  });
+
+  it("M7.1-5: fails when /sw.js is not served as JavaScript", async () => {
+    const results = await runSmokeChecks(await startSite({ serviceWorkerType: "text/html" }));
+
+    expect(failures(results)).toEqual(["/sw.js is served without a session"]);
   });
 
   it("M0.6-4: fails when / is served without a session (proxy not running)", async () => {

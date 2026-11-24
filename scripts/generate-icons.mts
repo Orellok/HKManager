@@ -119,7 +119,8 @@ export function renderIconPixels({ size, maskable }: Pick<IconSpec, "size" | "ma
       const offset = (row * size + column) * BYTES_PER_PIXEL;
       for (let channel = 0; channel < 3; channel += 1) {
         pixels[offset + channel] = Math.round(
-          ICON_BACKGROUND[channel] + (ICON_FOREGROUND[channel] - ICON_BACKGROUND[channel]) * glyphShare,
+          ICON_BACKGROUND[channel] +
+            (ICON_FOREGROUND[channel] - ICON_BACKGROUND[channel]) * glyphShare,
         );
       }
       pixels[offset + 3] = Math.round((shapeHits / samples) * 255);

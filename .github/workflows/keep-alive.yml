@@ -1,0 +1,81 @@
+name: Supabase keep-alive
+
+# VERIFY-01 (lead decision 2026-11-23): a free Supabase project that sees no activity for a
+# week can be paused. Three times a week this runs a read-only `select 1` against staging and
+# production. The repository is public: the query result is discarded and the log shows only
+# the environment and whether the query succeeded. GitHub disables scheduled workflows after
+# 60 days without repository activity (docs/setup/keep-alive.md).
+on:
+  schedule:
+    # Sunday, Wednesday and Friday at 04:17 UTC.
+    - cron: "17 4 * * 0,3,5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-keep-alive
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  keep-alive:
+    name: Keep ${{ matrix.environment }} active
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      # One environment failing must not stop the query on the other.
+      fail-fast: false
+      matrix:
+        include:
+          - environment: staging
+            project-ref: tmistmqyqcnjftovxyoy
+          - environment: production
+            project-ref: gnjdyiujvxbwhxmldgfn
+    steps:
+      - name: Check that the secret is set
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::The SUPABASE_ACCESS_TOKEN secret is not set (docs/setup/github-secrets.md)"
+            exit 1
+          fi
+
+      # Only package.json and the lockfile are needed: the Supabase CLI is a pinned devDependency.
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # All output of the CLI is discarded, so nothing from the database or the API reaches the
+      # public log; only the outcome is printed.
+      - name: Run a read-only query
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          ENVIRONMENT: ${{ matrix.environment }}
+          PROJECT_REF: ${{ matrix.project-ref }}
+        run: |
+          if pnpm exec supabase db query --remote="$PROJECT_REF" --read-only "select 1" \
+            > /dev/null 2>&1; then
+            echo "Keep-alive query on $ENVIRONMENT: OK"
+          else
+            echo "::error::Keep-alive query on $ENVIRONMENT failed (output hidden; run it locally to see why)"
+            exit 1
+          fi

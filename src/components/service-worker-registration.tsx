@@ -2,14 +2,18 @@
 
 import { useEffect } from "react";
 
+import { captureInstallPrompt } from "@/lib/pwa/install-prompt";
 import { SERVICE_WORKER_PATH } from "@/lib/pwa/manifest";
 
 /**
  * M7.1-4: registers the service worker (public/sw.js) in production builds, where it makes
  * the app installable and caches static assets. The app works without it, so an unsupported
- * browser or a failed registration is left alone.
+ * browser or a failed registration is left alone. It also keeps Chrome's install offer for
+ * the settings screen (NOTIF-13).
  */
 export function ServiceWorkerRegistration() {
+  useEffect(() => captureInstallPrompt(), []);
+
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) {
       return;

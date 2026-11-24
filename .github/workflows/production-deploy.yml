@@ -109,6 +109,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PRODUCTION_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.PRODUCTION_NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
         run: |
           failed=0
           fail() {
@@ -140,6 +141,14 @@ jobs:
             role=$(printf '%s' "$payload" | base64 --decode 2>/dev/null | jq -r '.role // empty' 2>/dev/null || true)
             [ "$role" = "anon" ] || fail "The PRODUCTION_NEXT_PUBLIC_SUPABASE_ANON_KEY variable is not a public anon or publishable key"
           fi
+          # M7.2: optional until the owner generated the keys (docs/setup/push.md); without it
+          # the settings screen says push is not set up. Public by design (browser bundle).
+          vapid="$NEXT_PUBLIC_VAPID_PUBLIC_KEY"
+          if [ -z "$vapid" ]; then
+            echo "::warning::The PRODUCTION_NEXT_PUBLIC_VAPID_PUBLIC_KEY variable is not set: push notifications stay off (docs/setup/push.md)"
+          elif ! [[ "$vapid" =~ ^B[A-Za-z0-9_-]{86}$ ]]; then
+            fail "The PRODUCTION_NEXT_PUBLIC_VAPID_PUBLIC_KEY variable is not a VAPID public key"
+          fi
           exit "$failed"
 
       - name: Check out the verified commit
@@ -169,6 +178,7 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PRODUCTION_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.PRODUCTION_NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
         run: >-
           npx --yes "netlify-cli@$NETLIFY_CLI_VERSION" deploy
           --site "$NETLIFY_SITE_ID" --message "$DEPLOY_MESSAGE"

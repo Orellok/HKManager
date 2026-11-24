@@ -6,7 +6,11 @@
  * and the app icons (/icons/) are answered from the cache, and stored there on first use. Every
  * other request (pages, RSC payloads, Server Actions, Route Handlers, files, Supabase) is not
  * intercepted at all: the browser fetches it as if there were no service worker, so no page or
- * data is ever cached and nothing works offline. Push (`push` / `notificationclick`) is M7.2.
+ * data is ever cached and nothing works offline.
+ *
+ * M7.2-10 (NOTIF-4, 10): `push` shows the notification the push Edge Function sent
+ * (supabase/functions/_shared/reminders.ts: title, body, url, tag); `notificationclick` brings
+ * an open app window to that path, or opens one. Only same-origin paths are followed.
  */
 
 const CACHE_VERSION = "v1";
@@ -86,4 +90,91 @@ self.addEventListener("fetch", (event) => {
   if (isCacheable(event.request)) {
     event.respondWith(cacheFirst(event.request));
   }
+});
+
+const NOTIFICATION_ICON = "/icons/icon-192.png";
+const FALLBACK_NOTIFICATION = {
+  title: "HKManager",
+  body: "יש עדכון במשימות.",
+  url: "/tasks",
+  tag: "hkmanager-daily",
+};
+const MAX_TITLE_LENGTH = 100;
+const MAX_BODY_LENGTH = 400;
+
+function boundedText(value, maxLength, fallback) {
+  return typeof value === "string" && value.trim() !== "" ? value.slice(0, maxLength) : fallback;
+}
+
+/** A same-origin path to open, or the tasks screen for anything else (NOTIF-10). */
+function safeTargetPath(value) {
+  if (typeof value === "string") {
+    try {
+      const url = new URL(value, self.location.origin);
+      if (url.origin === self.location.origin) {
+        return url.pathname + url.search + url.hash;
+      }
+    } catch {
+      // Not a URL: falls through to the tasks screen.
+    }
+  }
+  return FALLBACK_NOTIFICATION.url;
+}
+
+/** The payload as the function sends it; a missing or malformed one shows a generic text. */
+function notificationFrom(event) {
+  let data = null;
+  try {
+    data = event.data ? event.data.json() : null;
+  } catch {
+    data = null;
+  }
+  if (typeof data !== "object" || data === null) {
+    return FALLBACK_NOTIFICATION;
+  }
+  return {
+    title: boundedText(data.title, MAX_TITLE_LENGTH, FALLBACK_NOTIFICATION.title),
+    body: boundedText(data.body, MAX_BODY_LENGTH, FALLBACK_NOTIFICATION.body),
+    url: safeTargetPath(data.url),
+    tag: boundedText(data.tag, MAX_TITLE_LENGTH, FALLBACK_NOTIFICATION.tag),
+  };
+}
+
+self.addEventListener("push", (event) => {
+  const notification = notificationFrom(event);
+  event.waitUntil(
+    self.registration.showNotification(notification.title, {
+      body: notification.body,
+      tag: notification.tag,
+      // A newer summary replaces the one still shown, and still alerts.
+      renotify: true,
+      dir: "rtl",
+      lang: "he",
+      icon: NOTIFICATION_ICON,
+      badge: NOTIFICATION_ICON,
+      data: { url: notification.url },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const path = safeTargetPath(event.notification.data && event.notification.data.url);
+  event.waitUntil(
+    (async () => {
+      const target = new URL(path, self.location.origin).href;
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const open = windows.find((client) => new URL(client.url).origin === self.location.origin);
+      if (open) {
+        try {
+          const focused = await open.focus();
+          await (focused || open).navigate(target);
+          return;
+        } catch {
+          // A window that cannot be navigated (not controlled yet): open a new one instead.
+        }
+      }
+      await self.clients.openWindow(target);
+    })(),
+  );
 });

@@ -47,3 +47,10 @@ Run the device checklist below on **both** phones after M7 Push is on staging, a
 8. לחיצה על ההתראה פותחת את מסך המשימות.
 9. בטל את ההרשאה בהגדרות Chrome → מסך ההגדרות באפליקציה מציג "חסום בדפדפן".
 10. דווח: לכל שלב עבר/נכשל + זמן הגעה.
+
+## M7.2 build results (2026-11-24, agents)
+- **Push library:** none added. Web Push is implemented with Web Crypto only (`supabase/functions/_shared/web-push.ts`, RFC 8291 aes128gcm + RFC 8292 VAPID ES256, ~250 lines). It reproduces the RFC 8291 Appendix A example byte for byte (unit test) and its JWT verifies with the public key.
+- **Deno spike:** the function code type-checks with Deno 2.5 (`deno check`) and runs under Deno against the local Supabase stack (RFC vector, VAPID signing, Vault secret check, JWT rejection: all as expected). The Supabase edge-runtime container (`supabase functions serve`) could not fetch npm packages in the agents' sandbox (TLS proxy), so the first run in Supabase's own runtime is the staging deploy.
+- **pg_cron / pg_net on Free:** proven by the first staging migrations run of `20261129090000_m7_2_push.sql` (it fails with a named error if either is unavailable). Locally both are present.
+- **Delivery headers:** `Urgency: high`, `TTL` 12 h for the daily summary (10 min for the test), `Topic` = tag.
+- Remaining NEEDS-OWNER: the device checklist above, once the VAPID keys are set (docs/setup/push.md).

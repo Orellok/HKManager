@@ -19,7 +19,30 @@ function fakeResponse(body: string, ok = true, type = "basic"): FakeResponse {
 }
 
 /** Runs public/sw.js against an in-memory Cache Storage and a fake network. */
-function loadServiceWorker(network: (url: string) => FakeResponse = (url) => fakeResponse(url)) {
+type FakeWindow = {
+  url: string;
+  focus: ReturnType<typeof vi.fn>;
+  navigate: ReturnType<typeof vi.fn>;
+};
+
+function fakeWindow(url: string, navigateFails = false): FakeWindow {
+  const client: FakeWindow = {
+    url,
+    focus: vi.fn(async () => client),
+    navigate: vi.fn(async () => {
+      if (navigateFails) {
+        throw new TypeError("not controlled");
+      }
+      return client;
+    }),
+  };
+  return client;
+}
+
+function loadServiceWorker(
+  network: (url: string) => FakeResponse = (url) => fakeResponse(url),
+  windows: FakeWindow[] = [],
+) {
   const stores = new Map<string, Map<string, FakeResponse>>();
   const open = (name: string) => {
     const entries = stores.get(name) ?? new Map<string, FakeResponse>();
@@ -46,7 +69,12 @@ function loadServiceWorker(network: (url: string) => FakeResponse = (url) => fak
     location: { origin: ORIGIN },
     addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
     skipWaiting: vi.fn(),
-    clients: { claim: vi.fn(async () => undefined) },
+    clients: {
+      claim: vi.fn(async () => undefined),
+      matchAll: vi.fn(async () => windows),
+      openWindow: vi.fn(async () => null),
+    },
+    registration: { showNotification: vi.fn(async () => undefined) },
   };
   runInNewContext(SOURCE, { self, caches, fetch: fetchSpy, URL });
 
@@ -67,7 +95,36 @@ function loadServiceWorker(network: (url: string) => FakeResponse = (url) => fak
     await work;
   }
 
-  return { stores, open, fetchSpy, dispatchFetch, dispatchActivate, self };
+  async function dispatchPush(data: (() => unknown) | null) {
+    let work: Promise<unknown> = Promise.resolve();
+    listeners.get("push")?.({
+      data: data === null ? null : { json: data },
+      waitUntil: (promise: Promise<unknown>) => (work = promise),
+    });
+    await work;
+  }
+
+  async function dispatchClick(data: unknown) {
+    let work: Promise<unknown> = Promise.resolve();
+    const notification = { data, close: vi.fn() };
+    listeners.get("notificationclick")?.({
+      notification,
+      waitUntil: (promise: Promise<unknown>) => (work = promise),
+    });
+    await work;
+    return notification;
+  }
+
+  return {
+    stores,
+    open,
+    fetchSpy,
+    dispatchFetch,
+    dispatchActivate,
+    dispatchPush,
+    dispatchClick,
+    self,
+  };
 }
 
 describe("M7.1-3: the service worker caches static assets only", () => {
@@ -130,8 +187,97 @@ describe("M7.1-3: the service worker caches static assets only", () => {
     expect(entries?.has(`${ORIGIN}/_next/static/0.js`)).toBe(false);
     expect(entries?.has(`${ORIGIN}/_next/static/301.js`)).toBe(true);
   });
+});
 
-  it("M7.1-3: has no push handlers yet (M7.2)", () => {
-    expect(SOURCE).not.toMatch(/addEventListener\(\s*["'](push|notificationclick)["']/);
+describe("M7.2-10: push notifications in the service worker", () => {
+  it("M7.2-10: shows the pushed summary in Hebrew RTL with the icon, tag and target", async () => {
+    const sw = loadServiceWorker();
+    await sw.dispatchPush(() => ({
+      title: "HKManager",
+      body: "2 משימות להיום · 1 למחר",
+      url: "/tasks",
+      tag: "hkmanager-daily",
+    }));
+    expect(sw.self.registration.showNotification).toHaveBeenCalledWith("HKManager", {
+      body: "2 משימות להיום · 1 למחר",
+      tag: "hkmanager-daily",
+      renotify: true,
+      dir: "rtl",
+      lang: "he",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: "/tasks" },
+    });
+  });
+
+  it.each([
+    ["no data", null],
+    ["data that is not JSON", () => JSON.parse("not json")],
+    ["a JSON value that is not an object", () => 42],
+  ])("M7.2-10: %s shows a generic notification", async (_label, data) => {
+    const sw = loadServiceWorker();
+    await sw.dispatchPush(data);
+    expect(sw.self.registration.showNotification).toHaveBeenCalledWith(
+      "HKManager",
+      expect.objectContaining({ body: "יש עדכון במשימות.", data: { url: "/tasks" } }),
+    );
+  });
+
+  it.each([
+    ["another origin", "https://evil.example/phish", "/tasks"],
+    ["a protocol-relative URL", "//evil.example/x", "/tasks"],
+    ["a script URL", "javascript:alert(1)", "/tasks"],
+    ["a non-string", 7, "/tasks"],
+    ["a same-origin path", "/settings", "/settings"],
+    ["a same-origin absolute URL", `${ORIGIN}/tasks?view=list`, "/tasks?view=list"],
+  ])("M7.2-10: a payload target that is %s opens %s", async (_label, url, expected) => {
+    const sw = loadServiceWorker();
+    await sw.dispatchPush(() => ({ title: "t", body: "b", url, tag: "x" }));
+    expect(sw.self.registration.showNotification).toHaveBeenCalledWith(
+      "t",
+      expect.objectContaining({ data: { url: expected } }),
+    );
+  });
+
+  it("M7.2-10: overlong text is cut, empty text falls back", async () => {
+    const sw = loadServiceWorker();
+    await sw.dispatchPush(() => ({ title: "", body: "א".repeat(1000), url: "/tasks", tag: "" }));
+    const [title, options] = sw.self.registration.showNotification.mock.calls[0] as unknown as [
+      string,
+      { body: string; tag: string },
+    ];
+    expect(title).toBe("HKManager");
+    expect(options.body).toHaveLength(400);
+    expect(options.tag).toBe("hkmanager-daily");
+  });
+
+  it("M7.2-10: a click focuses an open app window and takes it to the target", async () => {
+    const other = fakeWindow("https://other.example/");
+    const app = fakeWindow(`${ORIGIN}/clients`);
+    const sw = loadServiceWorker(undefined, [other, app]);
+    const notification = await sw.dispatchClick({ url: "/tasks" });
+    expect(notification.close).toHaveBeenCalled();
+    expect(app.focus).toHaveBeenCalled();
+    expect(app.navigate).toHaveBeenCalledWith(`${ORIGIN}/tasks`);
+    expect(other.focus).not.toHaveBeenCalled();
+    expect(sw.self.clients.openWindow).not.toHaveBeenCalled();
+  });
+
+  it("M7.2-10: with no app window a click opens one; a foreign target opens the tasks", async () => {
+    const sw = loadServiceWorker();
+    await sw.dispatchClick({ url: "https://evil.example/" });
+    expect(sw.self.clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}/tasks`);
+  });
+
+  it("M7.2-10: a window that cannot be navigated → a new window", async () => {
+    const app = fakeWindow(`${ORIGIN}/`, true);
+    const sw = loadServiceWorker(undefined, [app]);
+    await sw.dispatchClick({ url: "/settings" });
+    expect(sw.self.clients.openWindow).toHaveBeenCalledWith(`${ORIGIN}/settings`);
+  });
+
+  it("M7.2-10: static-only caching is unchanged (no fetch handling for pages)", async () => {
+    const sw = loadServiceWorker();
+    expect(await sw.dispatchFetch(`${ORIGIN}/tasks`)).toBeUndefined();
   });
 });

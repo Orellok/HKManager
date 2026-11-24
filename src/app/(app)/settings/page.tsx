@@ -14,10 +14,12 @@ import {
 } from "@/lib/expense-categories/queries";
 import { logDbFailure } from "@/lib/log";
 import { NOTICE_PARAM, noticeMessage } from "@/lib/notices";
+import { getVapidPublicKey } from "@/lib/push/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { CategoryList } from "./category-list";
 import { CeilingList } from "./ceiling-list";
+import { PushSettings } from "./push-settings";
 
 const CATEGORIES_HEADING_ID = "expense-categories-heading";
 
@@ -25,7 +27,8 @@ const CATEGORIES_HEADING_ID = "expense-categories-heading";
  * SPEC 5.14: the settings screen. M3 holds the expense categories (EXP-3; owner decision:
  * both allowlisted users manage them): add, rename, reorder, archive and restore. M4.1 adds
  * the yearly ceilings (CEIL-1) for the admin only; the owner does not see that section, and
- * its screens answer her with 404 (requireAdmin()).
+ * its screens answer her with 404 (requireAdmin()). M7.2 adds this device's push
+ * notifications (NOTIF-5, 13, 14) for both users.
  */
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   await requireAllowedUser();
@@ -53,6 +56,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">הגדרות</h1>
       <RedirectNotice message={notice} />
+      <PushSettings vapidPublicKey={getVapidPublicKey()} />
       <section aria-labelledby={CATEGORIES_HEADING_ID} className="max-w-2xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id={CATEGORIES_HEADING_ID} tabIndex={-1} className="text-xl font-semibold">

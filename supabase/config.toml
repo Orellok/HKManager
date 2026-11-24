@@ -86,6 +86,12 @@ enabled = false
 [edge_runtime]
 enabled = false
 
+# M7.2: the push function authenticates both callers itself (pg_cron by the Vault secret, the
+# settings screen by the user's JWT), so the gateway's JWT check is off (docs/setup/push.md).
+[functions.push]
+verify_jwt = false
+import_map = "./functions/push/deno.json"
+
 [analytics]
 enabled = false
 

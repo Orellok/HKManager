@@ -39,6 +39,9 @@ async function loseNextActionAnswer(page: Page): Promise<() => Promise<void>> {
 }
 
 test_.describe("M7.1-1..6: PWA files without a session", () => {
+  // The service worker is blocked for every other test (playwright.config.ts).
+  test_.use({ serviceWorkers: "allow" });
+
   test_(
     "M7.1-5: manifest, service worker and icons are served without a session, with X-Robots-Tag",
     async ({ request }) => {

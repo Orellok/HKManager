@@ -11,7 +11,7 @@ import { trackCspViolations } from "./support/helpers";
 const ROBOTS = "noindex, nofollow";
 
 /**
- * Lets the next Server Action reach the server, then drops its answer, as a lost connection
+ * Lets the next save (Server Action) reach the server, then drops its answer, as a lost connection
  * after the server saved. Returns a function that stops dropping answers.
  */
 async function loseNextActionAnswer(page: Page): Promise<() => Promise<void>> {
@@ -19,7 +19,14 @@ async function loseNextActionAnswer(page: Page): Promise<() => Promise<void>> {
   let dropped = false;
   const handler = async (route: Route) => {
     const request = route.request();
-    if (!dropped && request.method() === "POST" && request.headers()["next-action"]) {
+    // Only the save itself (its form data carries the create key), not lookups such as the
+    // duplicate-name check.
+    if (
+      !dropped &&
+      request.method() === "POST" &&
+      request.headers()["next-action"] &&
+      (request.postData() ?? "").includes("create_key")
+    ) {
       dropped = true;
       await route.fetch();
       await route.abort("internetdisconnected");

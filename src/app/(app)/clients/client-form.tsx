@@ -5,6 +5,7 @@ import { unstable_rethrow } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
 import { Button, buttonClasses } from "@/components/button";
+import { CreateKeyInput } from "@/components/create-key-input";
 import { TextInputField, TextareaField } from "@/components/form-field";
 import { useServerForm } from "@/components/use-server-form";
 import {
@@ -26,6 +27,8 @@ type ClientFormProps = {
   initialValues: ClientFormValues;
   /** The client being edited (excluded from the duplicate check), or null for a new one. */
   clientId: string | null;
+  /** M7.1-8: the key of a create form (null when editing). */
+  createKey?: string | null;
   submitLabel: string;
   cancelHref: string;
 };
@@ -47,6 +50,7 @@ export function ClientForm({
   action,
   initialValues,
   clientId,
+  createKey = null,
   submitLabel,
   cancelHref,
 }: ClientFormProps) {
@@ -104,6 +108,7 @@ export function ClientForm({
       noValidate
       className="max-w-xl space-y-5"
     >
+      <CreateKeyInput value={createKey} />
       <p role="alert" className="text-destructive text-sm font-medium">
         {formMessage}
       </p>

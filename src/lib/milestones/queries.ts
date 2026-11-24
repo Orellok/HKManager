@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isCreateKeyConflict } from "@/lib/create-key";
 import { countFromDb } from "@/lib/db-numbers";
 import { agorotFromDb, agorotTotalFromDb, balanceAgorotFromDb } from "@/lib/money";
 
@@ -91,14 +92,23 @@ export async function getMilestone(
 
 export type InsertMilestoneResult = "created" | "project_missing" | "too_many";
 
-/** MS-1: adds a milestone at the end of the project's list (the database sets the place). */
+/**
+ * MS-1: adds a milestone at the end of the project's list (the database sets the place).
+ * M7.1-8: a repeated create key means the milestone was already created.
+ */
 export async function insertMilestone(
   supabase: SupabaseClient,
   projectId: string,
   input: MilestoneInput,
+  createKey: string | null = null,
 ): Promise<InsertMilestoneResult> {
-  const { error } = await supabase.from(TABLE).insert({ ...input, project_id: projectId });
+  const { error } = await supabase
+    .from(TABLE)
+    .insert({ ...input, project_id: projectId, create_key: createKey });
   if (error) {
+    if (createKey !== null && isCreateKeyConflict(error, TABLE)) {
+      return "created";
+    }
     if (error.code === FOREIGN_KEY_VIOLATION) {
       return "project_missing";
     }

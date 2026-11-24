@@ -1,3 +1,4 @@
+import { newCreateKey } from "@/lib/create-key";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { projectIdSchema } from "@/lib/projects/schema";
 import { createTaskAction } from "@/lib/tasks/actions";
@@ -44,6 +45,7 @@ export default async function NewTaskPage({ searchParams }: PageProps<"/tasks/ne
       <h1 className="text-2xl font-semibold">משימה חדשה</h1>
       <TaskForm
         action={createTaskAction.bind(null, from)}
+        createKey={newCreateKey()}
         initialValues={initialValues}
         clientOptions={clients.options}
         moreClientsExist={clients.hasMore}

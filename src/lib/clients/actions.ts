@@ -7,6 +7,7 @@ import { z } from "@/lib/zod";
 
 import type { ActionStatus } from "@/lib/action-status";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { readCreateKey } from "@/lib/create-key";
 import type { ServerFormState } from "@/lib/forms";
 import { withNotice } from "@/lib/notices";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -98,7 +99,7 @@ export async function createClientAction(
   const supabase = await createSupabaseServerClient();
   let id: string;
   try {
-    ({ id } = await insertClient(supabase, validation.data));
+    ({ id } = await insertClient(supabase, validation.data, readCreateKey(formData)));
   } catch (error) {
     logClientFailure("create", error);
     return { values, fieldErrors: {}, formError: MESSAGES.saveFailed };

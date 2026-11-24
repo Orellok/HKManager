@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { buttonClasses } from "@/components/button";
+import { newCreateKey } from "@/lib/create-key";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { NEW_CLIENT_PATH } from "@/lib/clients/paths";
 import { todayInJerusalem } from "@/lib/dates";
@@ -112,6 +113,7 @@ export default async function NewIncomePage({ searchParams }: PageProps<"/income
       <h1 className="text-2xl font-semibold">{title}</h1>
       <IncomeForm
         action={createIncomeAction.bind(null, from)}
+        createKey={newCreateKey()}
         initialValues={initialValues}
         clientOptions={options}
         moreClientsExist={hasMore}

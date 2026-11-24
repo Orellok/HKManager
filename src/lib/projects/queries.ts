@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { rowIdAfterCreateKeyConflict } from "@/lib/create-key";
 import type { ListView } from "@/lib/list-view";
 import { agorotFromDb } from "@/lib/money";
 import type { ListPage } from "@/lib/paged-list";
@@ -201,16 +202,22 @@ function clientRefusal(code: string | undefined): ClientRefusal | null {
 
 export type InsertProjectResult = { status: "created"; id: string } | { status: ClientRefusal };
 
+/** PRJ-1; M7.1-8: a repeated create key returns the project that key created. */
 export async function insertProject(
   supabase: SupabaseClient,
   input: ProjectInput,
+  createKey: string | null = null,
 ): Promise<InsertProjectResult> {
   const { data, error } = await supabase
     .from(TABLE)
-    .insert(input)
+    .insert({ ...input, create_key: createKey })
     .select("id")
     .single<{ id: string }>();
   if (error) {
+    const existingId = await rowIdAfterCreateKeyConflict(supabase, TABLE, error, createKey);
+    if (existingId !== null) {
+      return { status: "created", id: existingId };
+    }
     const refusal = clientRefusal(error.code);
     if (refusal) {
       return { status: refusal };

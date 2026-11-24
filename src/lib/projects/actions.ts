@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import type { ActionStatus } from "@/lib/action-status";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { readCreateKey } from "@/lib/create-key";
 import { CLIENTS_PATH } from "@/lib/clients/paths";
 import type { ServerFormState } from "@/lib/forms";
 import { logDbFailure } from "@/lib/log";
@@ -89,7 +90,11 @@ export async function createProjectAction(
 
   let result: Awaited<ReturnType<typeof insertProject>>;
   try {
-    result = await insertProject(await createSupabaseServerClient(), validation.data);
+    result = await insertProject(
+      await createSupabaseServerClient(),
+      validation.data,
+      readCreateKey(formData),
+    );
   } catch (error) {
     logDbFailure("projects", "create", error);
     return { values, fieldErrors: {}, formError: MESSAGES.saveFailed };

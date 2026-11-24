@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
+import { CreateKeyInput } from "@/components/create-key-input";
 import { Button, buttonClasses } from "@/components/button";
 import { checkDateInputs } from "@/components/check-date-inputs";
 import { SelectField, TextInputField, TextareaField } from "@/components/form-field";
@@ -41,6 +42,8 @@ type IncomeFormProps = {
   today: string;
   /** MS-4: choosing a milestone fills the amount with its balance (new incomes only). */
   fillAmountFromMilestone: boolean;
+  /** M7.1-8: the key of a create form (null when editing). */
+  createKey?: string | null;
   submitLabel: string;
   cancelHref: string;
 };
@@ -94,6 +97,7 @@ export function IncomeForm({
   initialChoices,
   today,
   fillAmountFromMilestone,
+  createKey = null,
   submitLabel,
   cancelHref,
 }: IncomeFormProps) {
@@ -240,6 +244,7 @@ export function IncomeForm({
       noValidate
       className="max-w-xl space-y-5"
     >
+      <CreateKeyInput value={createKey} />
       <p role="alert" className="text-destructive text-sm font-medium">
         {formMessage}
       </p>

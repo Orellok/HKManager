@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import type { ActionStatus } from "@/lib/action-status";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { readCreateKey } from "@/lib/create-key";
 import { todayInJerusalem } from "@/lib/dates";
 import type { ServerFormState } from "@/lib/forms";
 import { logDbFailure } from "@/lib/log";
@@ -125,6 +126,7 @@ async function saveIncomeForm(
       incomeId,
       input,
       confirmedBalance,
+      incomeId === null ? readCreateKey(formData) : null,
     );
   } catch (error) {
     logDbFailure("incomes", incomeId === null ? "create" : "update", error);

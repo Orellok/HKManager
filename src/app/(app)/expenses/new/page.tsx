@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { buttonClasses } from "@/components/button";
+import { newCreateKey } from "@/lib/create-key";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { todayInJerusalem } from "@/lib/dates";
 import { SETTINGS_PATH } from "@/lib/expense-categories/paths";
@@ -42,6 +43,7 @@ export default async function NewExpensePage() {
       <h1 className="text-2xl font-semibold">הוצאה חדשה</h1>
       <ExpenseForm
         action={createExpenseAction}
+        createKey={newCreateKey()}
         initialValues={{ ...EMPTY_EXPENSE_FORM_VALUES, expense_date: today }}
         categoryOptions={categoryOptions}
         today={today}

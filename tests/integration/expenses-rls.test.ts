@@ -817,6 +817,72 @@ describe("EXP-2: the expense-files bucket", () => {
     });
   });
 
+  it("M7.1-9: a file an expense replaced cannot be recorded by another expense (HKE04); its own expense may take it back", async () => {
+    const first = await uploadTracked();
+    const second = await uploadTracked();
+    const id = await insertAs(owner.client, {}, first);
+    const vendor = (await readExpense(id)).vendor;
+    await updateExpense(owner.client, id, expenseInput({ vendor }), second);
+
+    expect(await insertExpense(owner.client, expenseInput(), first)).toEqual({
+      status: "refused",
+      refusal: "file_missing",
+    });
+    const other = await insertAs(owner.client);
+    const otherVendor = (await readExpense(other)).vendor;
+    expect(
+      await updateExpense(owner.client, other, expenseInput({ vendor: otherVendor }), first),
+    ).toEqual({ status: "refused", refusal: "file_missing" });
+    const direct = await owner.client.from(TABLE).insert({ ...expenseInput(), file_path: first });
+    expect(direct.error?.code).toBe("HKE04");
+
+    expect(await updateExpense(owner.client, id, expenseInput({ vendor }), first)).toMatchObject({
+      status: "saved",
+    });
+    expect((await readExpense(id)).file_path).toBe(first);
+  });
+
+  it("M7.1-8: an expense sent again with the same create key is not recorded twice", async () => {
+    const key = randomUUID();
+    const vendor = `ספק ${MARKER} ${randomUUID()}`;
+    const path = await uploadTracked();
+    expect(await insertExpense(owner.client, expenseInput({ vendor }), path, key)).toEqual({
+      status: "saved",
+      hasFile: true,
+    });
+    // The same upload sent again: the expense recorded it.
+    expect(await insertExpense(owner.client, expenseInput({ vendor }), path, key)).toEqual({
+      status: "saved",
+      hasFile: true,
+    });
+    // A new upload with the same key: not recorded, so the action removes it.
+    const again = await uploadTracked();
+    expect(await insertExpense(owner.client, expenseInput({ vendor }), again, key)).toEqual({
+      status: "saved",
+      hasFile: true,
+      duplicate: true,
+    });
+    const { data } = await service.from(TABLE).select("id, file_path").eq("vendor", vendor);
+    expect(data).toEqual([{ id: expect.any(String), file_path: path }]);
+    // Without a key every insert creates a row, as before.
+    await insertExpense(owner.client, expenseInput({ vendor }), null);
+    await insertExpense(owner.client, expenseInput({ vendor }), null);
+    const { count } = await service
+      .from(TABLE)
+      .select("id", { count: "exact", head: true })
+      .eq("vendor", vendor);
+    expect(count).toBe(3);
+  });
+
+  it("M7.1-8: the create key cannot be changed by an update (no UPDATE grant)", async () => {
+    const id = await insertAs(owner.client);
+    const { error } = await owner.client
+      .from(TABLE)
+      .update({ create_key: randomUUID() })
+      .eq("id", id);
+    expect(error?.code).toBe(INSUFFICIENT_PRIVILEGE);
+  });
+
   it("SPEC 6: an unrecorded upload can be removed; a recorded file never, also after it was replaced or the expense deleted", async () => {
     const unrecorded = await uploadTracked();
     const first = await uploadTracked();

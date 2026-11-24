@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { buttonClasses } from "@/components/button";
+import { newCreateKey } from "@/lib/create-key";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { NEW_CLIENT_PATH, clientPath } from "@/lib/clients/paths";
 import { createProjectAction } from "@/lib/projects/actions";
@@ -63,6 +64,7 @@ export default async function NewProjectPage({ searchParams }: PageProps<"/proje
       <h1 className="text-2xl font-semibold">פרויקט חדש</h1>
       <ProjectForm
         action={createProjectAction}
+        createKey={newCreateKey()}
         initialValues={{ ...EMPTY_PROJECT_FORM_VALUES, client_id: selected?.id ?? "" }}
         clientOptions={options}
         moreClientsExist={hasMore}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { CreateKeyInput } from "@/components/create-key-input";
 import { Button, buttonClasses } from "@/components/button";
 import { checkDateInputs } from "@/components/check-date-inputs";
 import { SelectField, TextInputField, TextareaField } from "@/components/form-field";
@@ -24,6 +25,8 @@ type ProjectFormProps = {
   clientOptions: readonly ClientOption[];
   /** More active clients exist than `clientOptions` holds (CLIENT_OPTIONS_LIMIT). */
   moreClientsExist: boolean;
+  /** M7.1-8: the key of a create form (null when editing). */
+  createKey?: string | null;
   submitLabel: string;
   cancelHref: string;
 };
@@ -52,6 +55,7 @@ export function ProjectForm({
   initialValues,
   clientOptions,
   moreClientsExist,
+  createKey = null,
   submitLabel,
   cancelHref,
 }: ProjectFormProps) {
@@ -79,6 +83,7 @@ export function ProjectForm({
       noValidate
       className="max-w-xl space-y-5"
     >
+      <CreateKeyInput value={createKey} />
       <p role="alert" className="text-destructive text-sm font-medium">
         {formMessage}
       </p>

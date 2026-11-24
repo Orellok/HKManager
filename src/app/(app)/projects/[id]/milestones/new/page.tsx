@@ -1,3 +1,4 @@
+import { newCreateKey } from "@/lib/create-key";
 import { requireAllowedUser } from "@/lib/auth/guards";
 import { createMilestoneAction } from "@/lib/milestones/actions";
 import { EMPTY_MILESTONE_FORM_VALUES } from "@/lib/milestones/schema";
@@ -21,6 +22,7 @@ export default async function NewMilestonePage({
       </div>
       <MilestoneForm
         action={createMilestoneAction.bind(null, project.id)}
+        createKey={newCreateKey()}
         initialValues={EMPTY_MILESTONE_FORM_VALUES}
         submitLabel="שמירת אבן דרך"
         cancelHref={projectPath(project.id)}

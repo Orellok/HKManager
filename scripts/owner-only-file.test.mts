@@ -1,4 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -33,5 +42,28 @@ describe("M7.3-12: owner-only secret files", () => {
     writeOwnerOnlyFile(file, "new\n");
     expect(statSync(file).mode & 0o777).toBe(0o600);
     expect(readFileSync(file, "utf8")).toBe("new\n");
+  });
+
+  it("M7.3-12: the new content is never written into the old, wider-mode file", () => {
+    const file = tempFile();
+    writeFileSync(file, "old\n", { mode: 0o644 });
+    // A second name for the old file: it must still hold only the old content.
+    const oldInode = `${file}.old`;
+    linkSync(file, oldInode);
+    writeOwnerOnlyFile(file, "secret\n");
+    expect(readFileSync(oldInode, "utf8")).toBe("old\n");
+    expect(statSync(file).ino).not.toBe(statSync(oldInode).ino);
+    expect(readFileSync(file, "utf8")).toBe("secret\n");
+  });
+
+  it("M7.3-12: no temporary file is left behind, also when the write fails", () => {
+    const file = tempFile();
+    writeOwnerOnlyFile(file, "A=1\n");
+    const dir = file.slice(0, file.lastIndexOf("/"));
+    expect(readdirSync(dir)).toEqual(["secret.local"]);
+    const blocked = join(dir, "is-a-dir");
+    mkdirSync(blocked);
+    expect(() => writeOwnerOnlyFile(blocked, "x")).toThrow();
+    expect(readdirSync(dir).sort()).toEqual(["is-a-dir", "secret.local"]);
   });
 });

@@ -5,7 +5,7 @@
 - `db/schema.sql` – הסכמה, לעיון בלבד. **הסכמה משוחזרת מה-migrations של ה-repo**, כי הן יוצרות גם את מה שה-dump לא כולל: buckets של Storage, משימות pg_cron, סוד ה-cron ב-Vault והיסטוריית ה-migrations.
 - `storage/<bucket>/…` – כל הקבצים. `manifest.json` – commit, migration אחרונה, ספירת שורות לכל טבלה ו-SHA-256 לכל קובץ.
 
-הסקריפט `scripts/backup/restore.mts` בודק את כל ה-checksums, טוען את הנתונים **בטרנזקציה אחת** (בסוף בודק שספירת השורות בכל טבלה זהה ל-manifest; כל שגיאה = שום דבר לא משתנה), ואז מעלה את כל הקבצים ל-Storage. הוא מסרב לשחזר לתוך פרויקט שכבר יש בו נתונים, אלא אם מעבירים `--replace`.
+הסקריפט `scripts/backup/restore.mts` בודק את כל ה-checksums, טוען את הנתונים **בטרנזקציה אחת** (בסוף בודק שספירת השורות בכל טבלה זהה ל-manifest; כל שגיאה = שום דבר לא משתנה), ואז מעלה את כל הקבצים ל-Storage ומוריד כל אחד בחזרה מהיעד כדי לוודא SHA-256 זהה (כל קובץ חסר או שונה = כישלון). כל רכיב בארכיון חייב להיות קובץ רגיל (קישור סימבולי, hard link או התקן נדחים). הוא מסרב לשחזר לתוך פרויקט שכבר יש בו נתונים, אלא אם מעבירים `--replace`.
 
 אובדן נתונים מקסימלי: עד 7 ימים (סיכון שהתקבל, SPEC 8).
 
@@ -22,7 +22,7 @@ tar -xzOf ~/Downloads/hkmanager-production-XXXX.tar.gz manifest.json | grep -E '
 
 ## 2. לבחור יעד
 - **פרויקט Supabase חדש (מומלץ)** – כשפרויקט ה-production נמחק, נפגע או לא ברור מה מצבו. בתוכנית החינמית מותרים 2 פרויקטים פעילים: אם צריך מקום, להשהות (Pause) את staging.
-- **אותו פרויקט** – רק אם הסכמה תקינה ועדכנית (ה-migrations רצו) והבעיה היא בנתונים בלבד. דורש `--replace`, שמוחק את כל הנתונים בטבלאות שבגיבוי ומחליף אותם.
+- **אותו פרויקט** – רק אם הסכמה תקינה ועדכנית (ה-migrations רצו) והבעיה היא בנתונים בלבד. דורש `--replace`, שמוחק את כל הנתונים בטבלאות שבגיבוי ומחליף אותם. **שימו לב:** `--replace` לא מוחק קבצים ב-Storage של היעד שאינם בגיבוי – הוא רק מעלה (ודורס) את הקבצים שבגיבוי. קבצים שנוספו אחרי הגיבוי נשארים ב-Storage בלי רשומה שמפנה אליהם (לא מזיק; אפשר למחוק ידנית ב-Dashboard → Storage).
 
 ## 3. פרויקט חדש: סכמה מה-migrations
 1. Supabase Dashboard → New project (אותו אזור כמו קודם), סיסמת DB חזקה במנהל הסיסמאות. לרשום את ה-ref החדש (20 אותיות).
@@ -59,14 +59,15 @@ unset RESTORE_DB_URL RESTORE_SERVICE_KEY
 ### תרגול מקומי (בוצע 2026-11-24 – PASS)
 `node scripts/backup/restore-drill.mts --reset-local-database` על ה-stack המקומי: יוצר גיבוי באותו קוד שרץ ב-workflow (pg_dump דרך ה-CLI + כל אובייקטי ה-Storage, עם קבצי סימון בשני ה-buckets ושורת לקוח), מאפס את מסד הנתונים מה-migrations בלי seed (= פרויקט חדש), מוודא שהקבצים נעלמו, משחזר, ובודק שכל טבלה זהה בספירה וב-hash של התוכן ושכל קובץ זהה ב-SHA-256; אחר כך מוודא ששחזור חוזר בלי `--replace` נדחה ועם `--replace` מצליח וזהה. תוצאה:
 ```
-Database dump: OK (43 tables, 134 rows, 0.1 MB)
-Storage export: OK (4 objects in 2 buckets, 0.0 MB)
-After reset: 4 of 4 objects unavailable
-Database: restored 134 rows in 43 tables (counts verified)
-Storage: uploaded 4 objects
+Database dump: OK (43 tables, 20 rows, 0.0 MB)
+Storage export: OK (2 objects in 2 buckets, 0.0 MB)
+After reset: 2 of 2 objects unavailable
+Database: restored 20 rows in 43 tables (counts verified)
+Storage: uploaded 2 objects (read back, SHA-256 verified)
 Restore over existing data without --replace: refused, nothing changed
-Restore drill: PASS (43 tables / 134 rows identical by count and content hash; 4 objects identical by SHA-256)
+Restore drill: PASS (43 tables / 20 rows identical by count and content hash; 2 objects identical by SHA-256)
 ```
+ריצה קודמת על מסד עם יותר נתונים (134 שורות, 4 קבצים) עברה גם היא (PASS).
 
 ### תרגול על staging (לבצע פעם אחת לפני העלייה לאוויר)
 מוכיח את החלק שלא ניתן לבדוק מקומית: חיבור דרך ה-pooler, הרשאות `postgres` בפרויקט מנוהל ו-Storage בענן. staging בלבד – אין בו נתוני אמת.

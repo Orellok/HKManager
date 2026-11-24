@@ -201,3 +201,31 @@ export async function uploadObject(
     },
   );
 }
+
+/**
+ * Downloads every listed object from the target into `dir` and counts the ones that are
+ * missing or whose SHA-256 differs from the manifest.
+ */
+export async function countUnmatchedObjects(
+  target: StorageTarget,
+  objects: StorageObjectEntry[],
+  dir: string,
+): Promise<number> {
+  let unmatched = 0;
+  for (const [index, object] of objects.entries()) {
+    try {
+      const { sha256 } = await downloadObject(
+        target,
+        object.bucket,
+        object.path,
+        resolve(dir, `object-${index}`),
+      );
+      if (sha256 !== object.sha256) {
+        unmatched += 1;
+      }
+    } catch {
+      unmatched += 1;
+    }
+  }
+  return unmatched;
+}

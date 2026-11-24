@@ -1,5 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,6 +20,7 @@ import {
   buildRowCountCheck,
   extractArchive,
   pgEnvFromUrl,
+  restoreStorage,
   verifyChecksums,
 } from "./restore.mts";
 
@@ -127,5 +137,115 @@ describe("M7.3-10: restore checks", () => {
     await expect(verifyChecksums(target, manifest)).rejects.toThrow(
       "Checksum mismatch: db/data.sql",
     );
+  });
+});
+
+function pack(dir: string): string {
+  const archive = join(tempDir(), "b.tar.gz");
+  execFileSync("tar", ["-czf", archive, "-C", dir, "manifest.json", "db", "storage"]);
+  return archive;
+}
+
+describe("M7.3-10: archive entries must be regular files", () => {
+  it("M7.3-10: a symlinked Storage object is refused before anything is read", async () => {
+    const { dir } = await backupDir();
+    const outside = join(tempDir(), "secret.txt");
+    writeFileSync(outside, "%PDF");
+    const object = join(dir, "storage", "receipts", "inc", "a.pdf");
+    unlinkSync(object);
+    symlinkSync(outside, object);
+    const target = tempDir();
+    const manifest = await extractArchive(pack(dir), target);
+    await expect(verifyChecksums(target, manifest)).rejects.toThrow(
+      "The archive holds Storage object #1 in receipts that is not a regular file; refused",
+    );
+  });
+
+  it("M7.3-10: a symlinked folder on the way to an object is refused", async () => {
+    const { dir } = await backupDir();
+    const outside = tempDir();
+    mkdirSync(join(outside, "inc"));
+    writeFileSync(join(outside, "inc", "a.pdf"), "%PDF");
+    rmSync(join(dir, "storage", "receipts"), { recursive: true });
+    symlinkSync(outside, join(dir, "storage", "receipts"));
+    const target = tempDir();
+    const manifest = await extractArchive(pack(dir), target);
+    await expect(verifyChecksums(target, manifest)).rejects.toThrow(/not a regular file; refused/);
+  });
+
+  it("M7.3-10: a symlinked or hard-linked db/data.sql is refused", async () => {
+    for (const kind of ["symlink", "hardlink"] as const) {
+      const { dir } = await backupDir();
+      const data = join(dir, "db", "data.sql");
+      const copy = join(dir, "db", "copy.sql");
+      writeFileSync(copy, readFileSync(data));
+      unlinkSync(data);
+      if (kind === "symlink") {
+        symlinkSync(copy, data);
+      } else {
+        linkSync(copy, data);
+      }
+      const target = tempDir();
+      const manifest = await extractArchive(pack(dir), target);
+      await expect(verifyChecksums(target, manifest), kind).rejects.toThrow(
+        "The archive holds db/data.sql that is not a regular file; refused",
+      );
+    }
+  });
+
+  it("M7.3-10: a symlinked manifest.json is refused before it is parsed", async () => {
+    const { dir } = await backupDir();
+    const real = join(tempDir(), "manifest.json");
+    writeFileSync(real, readFileSync(join(dir, "manifest.json")));
+    unlinkSync(join(dir, "manifest.json"));
+    symlinkSync(real, join(dir, "manifest.json"));
+    await expect(extractArchive(pack(dir), tempDir())).rejects.toThrow(
+      "The archive holds manifest.json that is not a regular file; refused",
+    );
+  });
+
+  it("M7.3-10: a missing object file is refused", async () => {
+    const { dir } = await backupDir();
+    unlinkSync(join(dir, "storage", "receipts", "inc", "a.pdf"));
+    const target = tempDir();
+    const manifest = await extractArchive(pack(dir), target);
+    await expect(verifyChecksums(target, manifest)).rejects.toThrow(
+      "The archive is missing Storage object #1 in receipts",
+    );
+  });
+});
+
+/** A Storage API that keeps uploads and serves them back, optionally changed or lost. */
+function fakeTarget(mode: "ok" | "changed" | "lost") {
+  const stored = new Map<string, Buffer>();
+  const fetchFn = (async (input: URL | RequestInfo, init: RequestInit = {}) => {
+    const path = new URL(String(input)).pathname;
+    if (init.method === "POST") {
+      stored.set(path, Buffer.from(await new Response(init.body as Blob).arrayBuffer()));
+      return new Response("{}");
+    }
+    const bytes = stored.get(path);
+    if (!bytes || mode === "lost") {
+      return new Response(JSON.stringify({ error: "not_found" }), { status: 400 });
+    }
+    const served = mode === "changed" ? Buffer.concat([bytes, Buffer.from([1])]) : bytes;
+    return new Response(new Uint8Array(served));
+  }) as typeof fetch;
+  return { apiUrl: "http://target", serviceKey: "k", fetch: fetchFn };
+}
+
+describe("M7.3-10: Storage restore is read back", () => {
+  it("M7.3-10: objects that read back with the manifest's SHA-256 pass", async () => {
+    const { dir, manifest } = await backupDir();
+    await expect(restoreStorage(dir, manifest, fakeTarget("ok"))).resolves.toBeUndefined();
+  });
+
+  it("M7.3-10: a changed or missing object in the target fails the restore", async () => {
+    for (const mode of ["changed", "lost"] as const) {
+      const { dir, manifest } = await backupDir();
+      await expect(restoreStorage(dir, manifest, fakeTarget(mode)), mode).rejects.toThrow(
+        "Storage check failed: 1 of 1 objects missing or different in the target",
+      );
+    }
   });
 });

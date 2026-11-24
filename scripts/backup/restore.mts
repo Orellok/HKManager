@@ -7,7 +7,7 @@
  *   node scripts/backup/restore.mts <backup.tar.gz> --yes [--replace]
  */
 import { execFile } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -22,7 +22,12 @@ import {
   quoteTable,
   type Manifest,
 } from "./manifest.mts";
-import { objectFilePath, uploadObject, type StorageTarget } from "./storage.mts";
+import {
+  countUnmatchedObjects,
+  objectFilePath,
+  uploadObject,
+  type StorageTarget,
+} from "./storage.mts";
 
 const execFileAsync = promisify(execFile);
 const PSQL_TIMEOUT_MS = 60 * 60_000;
@@ -37,6 +42,42 @@ export const SEEDED_BY_MIGRATIONS = new Set([
 
 export type Log = (line: string) => void;
 
+/**
+ * An archive entry must be a regular file reached through real directories: a symlink,
+ * hard link, device or directory in its place could make the restore read (and upload or
+ * load) a file from outside the backup.
+ */
+export function assertRegularFile(root: string, segments: string[], label: string): void {
+  let current = root;
+  for (const [index, segment] of segments.entries()) {
+    current = join(current, segment);
+    let stats;
+    try {
+      stats = lstatSync(current);
+    } catch {
+      throw new BackupError(`The archive is missing ${label}`);
+    }
+    const last = index === segments.length - 1;
+    const ok = last ? stats.isFile() && stats.nlink === 1 : stats.isDirectory();
+    if (!ok) {
+      throw new BackupError(`The archive holds ${label} that is not a regular file; refused`);
+    }
+  }
+}
+
+export function assertArchiveFiles(dir: string, manifest: Manifest): void {
+  for (const file of manifest.database.files) {
+    assertRegularFile(dir, file.path.split("/"), file.path);
+  }
+  for (const [index, object] of manifest.storage.objects.entries()) {
+    assertRegularFile(
+      dir,
+      ["storage", object.bucket, ...object.path.split("/")],
+      `Storage object #${index + 1} in ${object.bucket}`,
+    );
+  }
+}
+
 export async function extractArchive(archivePath: string, dir: string): Promise<Manifest> {
   try {
     await execFileAsync("tar", [
@@ -50,11 +91,16 @@ export async function extractArchive(archivePath: string, dir: string): Promise<
   } catch {
     throw new BackupError("The archive could not be unpacked");
   }
+  assertRegularFile(dir, [MANIFEST_FILE], MANIFEST_FILE);
   return parseManifest(readFileSync(join(dir, MANIFEST_FILE), "utf8"));
 }
 
-/** Every database file and Storage object must match the manifest's SHA-256 and size. */
+/**
+ * Every database file and Storage object must be a regular file and match the manifest's
+ * SHA-256 and size.
+ */
 export async function verifyChecksums(dir: string, manifest: Manifest): Promise<void> {
+  assertArchiveFiles(dir, manifest);
   for (const file of manifest.database.files) {
     const { digest, bytes } = await hashFile(join(dir, file.path), "sha256");
     if (digest !== file.sha256 || bytes !== file.bytes) {
@@ -189,6 +235,17 @@ export async function restoreStorage(
   for (const object of manifest.storage.objects) {
     await uploadObject(target, object, join(dir, "storage"));
   }
+  // Read back from the target: an upload that the API accepted is not yet proof.
+  const unmatched = await countUnmatchedObjects(
+    target,
+    manifest.storage.objects,
+    join(dir, "storage-check"),
+  );
+  if (unmatched > 0) {
+    throw new BackupError(
+      `Storage check failed: ${unmatched} of ${manifest.storage.objects.length} objects missing or different in the target`,
+    );
+  }
 }
 
 export async function restoreArchive(options: {
@@ -213,7 +270,9 @@ export async function restoreArchive(options: {
       `Database: restored ${rows} rows in ${Object.keys(manifest.database.rowCounts).length} tables (counts verified)`,
     );
     await restoreStorage(dir, manifest, options.storage);
-    log(`Storage: uploaded ${manifest.storage.objects.length} objects`);
+    log(
+      `Storage: uploaded ${manifest.storage.objects.length} objects (read back, SHA-256 verified)`,
+    );
     return manifest;
   } finally {
     rmSync(dir, { recursive: true, force: true });

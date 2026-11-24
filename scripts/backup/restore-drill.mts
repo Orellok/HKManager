@@ -16,9 +16,9 @@ import { promisify } from "node:util";
 
 import { createBackupArchive, type Log } from "./backup.mts";
 import { BackupError, describeUnexpected } from "./backup-error.mts";
-import { quoteTable, type Manifest } from "./manifest.mts";
+import { quoteTable } from "./manifest.mts";
 import { pgEnvFromUrl, restoreArchive } from "./restore.mts";
-import { downloadObject, type StorageTarget } from "./storage.mts";
+import { countUnmatchedObjects, type StorageTarget } from "./storage.mts";
 import { readLocalStack, resetLocalDatabase, type LocalStack } from "./supabase-source.mts";
 
 const execFileAsync = promisify(execFile);
@@ -82,26 +82,6 @@ async function addMarkers(stack: LocalStack, storage: StorageTarget): Promise<vo
   }
 }
 
-async function objectsMatch(storage: StorageTarget, manifest: Manifest, dir: string) {
-  let missing = 0;
-  for (const [index, object] of manifest.storage.objects.entries()) {
-    try {
-      const { sha256 } = await downloadObject(
-        storage,
-        object.bucket,
-        object.path,
-        join(dir, `object-${index}`),
-      );
-      if (sha256 !== object.sha256) {
-        missing += 1;
-      }
-    } catch {
-      missing += 1;
-    }
-  }
-  return missing;
-}
-
 export async function runRestoreDrill(log: Log = console.log): Promise<void> {
   const stack = await readLocalStack();
   const storage: StorageTarget = { apiUrl: stack.apiUrl, serviceKey: stack.serviceKey };
@@ -124,7 +104,11 @@ export async function runRestoreDrill(log: Log = console.log): Promise<void> {
 
     log("Resetting the local database (supabase db reset --no-seed)…");
     await resetLocalDatabase();
-    const gone = await objectsMatch(storage, manifest, join(workDir, "after-reset"));
+    const gone = await countUnmatchedObjects(
+      storage,
+      manifest.storage.objects,
+      join(workDir, "after-reset"),
+    );
     log(`After reset: ${gone} of ${manifest.storage.objects.length} objects unavailable`);
     if (gone !== manifest.storage.objects.length) {
       throw new BackupError(
@@ -172,7 +156,11 @@ export async function runRestoreDrill(log: Log = console.log): Promise<void> {
       log,
     });
     await compare("after --replace restore");
-    const mismatched = await objectsMatch(storage, manifest, join(workDir, "after-restore"));
+    const mismatched = await countUnmatchedObjects(
+      storage,
+      manifest.storage.objects,
+      join(workDir, "after-restore"),
+    );
     if (mismatched > 0) {
       throw new BackupError(
         `Drill: ${mismatched} Storage objects missing or different after restore`,

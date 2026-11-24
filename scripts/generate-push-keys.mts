@@ -7,8 +7,10 @@
  * Usage: node scripts/generate-push-keys.mts <staging|production> [--force]
  */
 import { generateKeyPairSync } from "node:crypto";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { writeOwnerOnlyFile } from "./owner-only-file.mts";
 
 export const ENVIRONMENTS = {
   staging: { subject: "https://hkmanager-staging.netlify.app", projectRef: "tmistmqyqcnjftovxyoy" },
@@ -65,7 +67,7 @@ function main(args: string[]): number {
   }
   const { subject, projectRef } = ENVIRONMENTS[environment];
   const keys = generateVapidKeys();
-  writeFileSync(file, renderEnvFile(keys, subject), { mode: 0o600 });
+  writeOwnerOnlyFile(file, renderEnvFile(keys, subject));
   console.log(`Wrote ${file} (owner-only). The private key is only in that file.`);
   console.log("");
   console.log(`Public key (not secret): ${keys.publicKey}`);

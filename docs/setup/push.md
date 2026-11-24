@@ -9,7 +9,7 @@ How the daily push works: pg_cron (06:00 and 07:00 UTC) → `invoke_daily_remind
 ## Owner steps – once per environment (staging first, then production)
 Never commit the key file and never paste the private key into a chat.
 
-1. **Generate the keys** on your computer (repo checkout, `pnpm install` done):
+1. **Generate the keys** on your computer (repo checkout, `pnpm install` done, **Node >= 22.18** – older Node cannot run `.mts` scripts directly; check with `node --version`):
    `node scripts/generate-push-keys.mts staging`
    It writes `supabase/.env.push.staging.local` (git-ignored, readable by you only) and prints the **public** key.
 2. **Store them as Edge Function secrets** (Supabase CLI logged in with `pnpm exec supabase login`):

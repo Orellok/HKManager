@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import type { ActionStatus } from "@/lib/action-status";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { readCreateKey } from "@/lib/create-key";
 import { DEBTS_PATH } from "@/lib/debts/paths";
 import type { ServerFormState } from "@/lib/forms";
 import { logDbFailure } from "@/lib/log";
@@ -81,6 +82,7 @@ export async function createMilestoneAction(
       await createSupabaseServerClient(),
       project.data,
       validation.data,
+      readCreateKey(formData),
     );
   } catch (error) {
     logDbFailure("milestones", "create", error);

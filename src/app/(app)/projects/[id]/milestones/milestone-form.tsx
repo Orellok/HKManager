@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { CreateKeyInput } from "@/components/create-key-input";
 import { Button, buttonClasses } from "@/components/button";
 import { checkDateInputs } from "@/components/check-date-inputs";
 import { TextInputField } from "@/components/form-field";
@@ -19,6 +20,8 @@ import {
 type MilestoneFormProps = {
   action: (state: MilestoneFormState, formData: FormData) => Promise<MilestoneFormState>;
   initialValues: MilestoneFormValues;
+  /** M7.1-8: the key of a create form (null when editing). */
+  createKey?: string | null;
   submitLabel: string;
   cancelHref: string;
 };
@@ -37,6 +40,7 @@ function checkDueDateInput(form: HTMLFormElement) {
 export function MilestoneForm({
   action,
   initialValues,
+  createKey = null,
   submitLabel,
   cancelHref,
 }: MilestoneFormProps) {
@@ -59,6 +63,7 @@ export function MilestoneForm({
       noValidate
       className="max-w-xl space-y-5"
     >
+      <CreateKeyInput value={createKey} />
       <p role="alert" className="text-destructive text-sm font-medium">
         {formMessage}
       </p>

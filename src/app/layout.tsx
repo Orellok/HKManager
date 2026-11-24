@@ -3,18 +3,18 @@ import { Heebo } from "next/font/google";
 import { connection } from "next/server";
 
 import { AppNav } from "@/components/app-nav";
+import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { SignOutForm } from "@/components/sign-out-form";
 import { getUserAccess } from "@/lib/auth/guards";
 import { todayInJerusalem } from "@/lib/dates";
 import { logDbFailure } from "@/lib/log";
+import { APP_NAME, THEME_COLOR } from "@/lib/pwa/manifest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { badgeCount } from "@/lib/tasks/grouping";
 import { getTaskReminderCounts } from "@/lib/tasks/queries";
 import { cn } from "@/lib/utils";
 
 import "./globals.css";
-
-const APP_NAME = "HKManager";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -30,6 +30,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: THEME_COLOR,
 };
 
 /**
@@ -61,6 +62,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="he" dir="rtl" className={heebo.variable}>
       <body className="flex min-h-dvh flex-col">
+        <ServiceWorkerRegistration />
         <header className="border-b">
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-2">
             <p className="py-1 text-lg font-semibold">{APP_NAME}</p>

@@ -101,9 +101,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Every request except static build assets, which carry no data or inline code.
+    // Every request except static build assets, which carry no data or inline code, and the
+    // PWA files (M7.1-5: the manifest, the service worker and the icons), which the browser
+    // fetches without a session. Their static headers come from next.config.ts / netlify.toml.
     // Prefetch requests are NOT excluded: their headers are client-controlled, and a
     // prefetch returns the page's RSC payload, so the auth checks must run for them too.
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest\\.webmanifest$|sw\\.js$|icons/).*)",
   ],
 };

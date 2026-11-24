@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type ChangeEvent } from "react";
 
+import { CreateKeyInput } from "@/components/create-key-input";
 import { Button, buttonClasses } from "@/components/button";
 import { checkDateInputs } from "@/components/check-date-inputs";
 import { SelectField, TextInputField, TextareaField } from "@/components/form-field";
@@ -49,6 +50,8 @@ type ExpenseFormProps = {
   today: string;
   /** Editing an expense that has a file: its viewing link (a new file replaces it). */
   currentFileHref: string | null;
+  /** M7.1-8: the key of a create form (null when editing). */
+  createKey?: string | null;
   submitLabel: string;
   cancelHref: string;
 };
@@ -111,6 +114,7 @@ export function ExpenseForm({
   categoryOptions,
   today,
   currentFileHref,
+  createKey = null,
   submitLabel,
   cancelHref,
 }: ExpenseFormProps) {
@@ -240,6 +244,7 @@ export function ExpenseForm({
       noValidate
       className="max-w-xl space-y-5"
     >
+      <CreateKeyInput value={createKey} />
       <p role="alert" className="text-destructive text-sm font-medium">
         {formMessage}
       </p>

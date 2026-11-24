@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calendarReturnTarget,
   editTaskPath,
   newClientTaskPath,
   newProjectTaskPath,
@@ -32,5 +33,34 @@ describe("TASK-8: task routes carry ids and fixed codes only", () => {
     expect(taskReturnTargetFrom(undefined)).toBe("tasks");
     expect(tasksViewFrom("closed")).toBe("closed");
     expect(tasksViewFrom(["closed"])).toBe("open");
+  });
+});
+
+describe("M7.1-12: a task opened from the calendar returns to that view and date", () => {
+  it("M7.1-12: the edit link carries the calendar view and date as one code", () => {
+    const from = calendarReturnTarget({ view: "week", date: "2026-11-17" });
+    expect(from).toBe("calendar:week:2026-11-17");
+    expect(editTaskPath(ID, from)).toBe(`/tasks/${ID}/edit?from=calendar%3Aweek%3A2026-11-17`);
+  });
+
+  it("M7.1-12: a saved, deleted or cancelled task goes back to the calendar view", () => {
+    const from = taskReturnTargetFrom("calendar:month:2026-02-10");
+    expect(from).toBe("calendar:month:2026-02-10");
+    expect(taskReturnPath(from, { clientId: ID, projectId: ID })).toBe(
+      "/calendar?view=month&date=2026-02-10",
+    );
+  });
+
+  it("M7.1-12: an unknown view, a bad or out-of-range date, or extra parts mean the list", () => {
+    for (const param of [
+      "calendar:year:2026-02-10",
+      "calendar:week:2026-02-30",
+      "calendar:week:1800-01-01",
+      "calendar:week",
+      "calendar:week:2026-02-10:x",
+      "calendar",
+    ]) {
+      expect(taskReturnTargetFrom(param)).toBe("tasks");
+    }
   });
 });

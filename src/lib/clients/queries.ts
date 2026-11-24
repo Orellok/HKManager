@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { rowIdAfterCreateKeyConflict } from "@/lib/create-key";
 import type { ListView } from "@/lib/list-view";
 
 import { duplicateNameKey } from "./duplicate-name";
@@ -101,11 +102,22 @@ export async function findClientsWithSameName(
   }));
 }
 
-export async function insertClient(supabase: SupabaseClient, input: ClientInput) {
-  const { data, error } = await supabase.from(TABLE).insert(input).select("id").single<{
-    id: string;
-  }>();
+/** CLI-1; M7.1-8: a repeated create key returns the client that key created. */
+export async function insertClient(
+  supabase: SupabaseClient,
+  input: ClientInput,
+  createKey: string | null = null,
+): Promise<{ id: string }> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ ...input, create_key: createKey })
+    .select("id")
+    .single<{ id: string }>();
   if (error) {
+    const existingId = await rowIdAfterCreateKeyConflict(supabase, TABLE, error, createKey);
+    if (existingId !== null) {
+      return { id: existingId };
+    }
     throw new Error("Could not create the client", { cause: error });
   }
   return data;

@@ -125,12 +125,14 @@ type SaveRow = { result: unknown; income_id: unknown; balance: unknown };
  * MS-4 / MS-5 / INC-1: records a new income (id null) or saves changes to one, through
  * save_income(), which checks a milestone payment against the balance under a lock.
  * `confirmedBalance` is the balance the user confirmed paying above, or null.
+ * M7.1-8: a new income whose `createKey` was already used returns the income it created.
  */
 export async function saveIncome(
   supabase: SupabaseClient,
   id: string | null,
   input: IncomeInput,
   confirmedBalance: number | null,
+  createKey: string | null = null,
 ): Promise<SaveIncomeResult> {
   const { data, error } = await supabase
     .rpc("save_income", {
@@ -143,6 +145,7 @@ export async function saveIncome(
       p_payment_method: input.payment_method,
       p_notes: input.notes,
       p_confirmed_balance: confirmedBalance,
+      p_create_key: id === null ? createKey : null,
     })
     .single<SaveRow>();
   if (error) {

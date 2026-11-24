@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import type { ActionStatus } from "@/lib/action-status";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { readCreateKey } from "@/lib/create-key";
 import type { ServerFormState } from "@/lib/forms";
 import { logDbFailure } from "@/lib/log";
 import { withNotice } from "@/lib/notices";
@@ -108,7 +109,7 @@ async function saveTaskForm(
     }
     result =
       taskId === null
-        ? await insertTask(supabase, input)
+        ? await insertTask(supabase, input, readCreateKey(formData))
         : await updateTask(supabase, taskId, input);
   } catch (error) {
     logDbFailure("tasks", taskId === null ? "create" : "update", error);

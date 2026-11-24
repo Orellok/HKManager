@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import type { ActionStatus } from "@/lib/action-status";
 import { requireAllowedUser } from "@/lib/auth/guards";
+import { readCreateKey } from "@/lib/create-key";
 import { todayInJerusalem } from "@/lib/dates";
 import type { ServerFormState } from "@/lib/forms";
 import { isMonth } from "@/lib/incomes/month";
@@ -170,7 +171,7 @@ async function saveExpenseForm(
     try {
       result =
         expenseId === null
-          ? await insertExpense(supabase, validation.data, uploadedPath)
+          ? await insertExpense(supabase, validation.data, uploadedPath, readCreateKey(formData))
           : await updateExpense(supabase, expenseId, validation.data, uploadedPath);
     } catch (error) {
       logDbFailure("expenses", expenseId === null ? "create" : "update", error);
@@ -182,7 +183,8 @@ async function saveExpenseForm(
     if (result.status === "refused") {
       return refusedState(values, result.refusal);
     }
-    recorded = true;
+    // A repeated create (M7.1-8) did not record this request's upload: it is removed below.
+    recorded = !result.duplicate;
     hasFile = result.hasFile;
   } catch (error) {
     logDbFailure("expenses", "check upload", error);

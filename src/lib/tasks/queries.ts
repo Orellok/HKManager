@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { rowIdAfterCreateKeyConflict } from "@/lib/create-key";
 import { addDays } from "@/lib/dates";
 import { countFromDb } from "@/lib/db-numbers";
 import type { ListPage } from "@/lib/paged-list";
@@ -138,17 +139,22 @@ export type SaveTaskResult =
   | { status: "not_found" }
   | { status: "refused"; refusal: TaskRefusal };
 
-/** TASK-1: creates a task. */
+/** TASK-1: creates a task. M7.1-8: a repeated create key returns the task that key created. */
 export async function insertTask(
   supabase: SupabaseClient,
   input: TaskInput,
+  createKey: string | null = null,
 ): Promise<SaveTaskResult> {
   const { data, error } = await supabase
     .from(TABLE)
-    .insert(input)
+    .insert({ ...input, create_key: createKey })
     .select("id")
     .single<{ id: string }>();
   if (error) {
+    const existingId = await rowIdAfterCreateKeyConflict(supabase, TABLE, error, createKey);
+    if (existingId !== null) {
+      return { status: "saved", id: existingId };
+    }
     const refusal = refusalOf(error.code);
     if (refusal) {
       return { status: "refused", refusal };

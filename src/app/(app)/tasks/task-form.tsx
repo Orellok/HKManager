@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type ChangeEvent } from "react";
 
+import { CreateKeyInput } from "@/components/create-key-input";
 import { Button, buttonClasses } from "@/components/button";
 import { checkDateInputs } from "@/components/check-date-inputs";
 import { SelectField, TextInputField, TextareaField } from "@/components/form-field";
@@ -38,6 +39,8 @@ type TaskFormProps = {
   moreProjectsExist: boolean;
   /** The edit form also changes the status (open / done / cancelled). */
   showStatus: boolean;
+  /** M7.1-8: the key of a create form (null when editing). */
+  createKey?: string | null;
   submitLabel: string;
   cancelHref: string;
 };
@@ -80,6 +83,7 @@ export function TaskForm({
   projectOptions,
   moreProjectsExist,
   showStatus,
+  createKey = null,
   submitLabel,
   cancelHref,
 }: TaskFormProps) {
@@ -143,6 +147,7 @@ export function TaskForm({
       noValidate
       className="max-w-xl space-y-5"
     >
+      <CreateKeyInput value={createKey} />
       <p role="alert" className="text-destructive text-sm font-medium">
         {formMessage}
       </p>

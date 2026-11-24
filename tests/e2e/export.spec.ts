@@ -11,6 +11,7 @@ import {
   expectNavCurrent,
   hasHorizontalScroll,
   trackCspViolations,
+  isAppConsoleProblem,
 } from "./support/helpers";
 
 /**
@@ -366,7 +367,7 @@ test_.describe("criterion 4 / 5: validation and security", () => {
       });
       const consoleMessages: string[] = [];
       page.on("console", (message) => {
-        if (message.type() === "warning" || message.type() === "error") {
+        if (isAppConsoleProblem(message.type(), message.text())) {
           consoleMessages.push(message.text());
         }
       });

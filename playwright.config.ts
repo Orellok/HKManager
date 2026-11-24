@@ -17,6 +17,10 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     trace: "retain-on-failure",
+    // M7.1: once the app's service worker controls a page, page.route() no longer sees the
+    // page's requests, which the failed-request tests rely on. Only the PWA tests allow it
+    // (tests/e2e/pwa-hardening.spec.ts).
+    serviceWorkers: "block",
   },
   // Chromium only (SPEC section 10): an Android phone viewport and a desktop viewport.
   projects: [

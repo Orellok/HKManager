@@ -95,6 +95,17 @@ describe("buildContentSecurityPolicy", () => {
     expect(directive(policy, "connect-src")).toBe(`connect-src 'self' ${SUPABASE_URL}`);
   });
 
+  it("M7.1-4: the service worker and the manifest may only come from the app itself", () => {
+    const policy = buildContentSecurityPolicy({
+      nonce: "n",
+      isDevelopment: false,
+      supabaseUrl: SUPABASE_URL,
+    });
+
+    expect(directive(policy, "worker-src")).toBe("worker-src 'self'");
+    expect(directive(policy, "manifest-src")).toBe("manifest-src 'self'");
+  });
+
   it("M0.3-8: keeps the port of a local Supabase URL in connect-src", () => {
     const policy = buildContentSecurityPolicy({
       nonce: "n",

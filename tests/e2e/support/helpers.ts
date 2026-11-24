@@ -9,6 +9,17 @@ export const VIEWPORT_WIDTHS_BY_PROJECT: Record<string, number[]> = {
 export const MIN_TOUCH_TARGET = 44;
 
 /**
+ * A console warning or error from the app. Excludes the message Playwright itself logs when it
+ * blocks the service worker registration (serviceWorkers: "block" in playwright.config.ts).
+ */
+export function isAppConsoleProblem(type: string, text: string): boolean {
+  return (
+    (type === "warning" || type === "error") &&
+    text !== "Service Worker registration blocked by Playwright"
+  );
+}
+
+/**
  * Records CSP violations from the first byte of every navigation, through the
  * securitypolicyviolation event (as shell.spec.ts does) and console errors.
  */

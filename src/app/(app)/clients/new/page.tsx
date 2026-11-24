@@ -2,6 +2,7 @@ import { requireAllowedUser } from "@/lib/auth/guards";
 import { createClientAction } from "@/lib/clients/actions";
 import { CLIENTS_PATH } from "@/lib/clients/paths";
 import { EMPTY_CLIENT_FORM_VALUES } from "@/lib/clients/schema";
+import { newCreateKey } from "@/lib/create-key";
 
 import { ClientForm } from "../client-form";
 
@@ -16,6 +17,7 @@ export default async function NewClientPage() {
         action={createClientAction}
         initialValues={EMPTY_CLIENT_FORM_VALUES}
         clientId={null}
+        createKey={newCreateKey()}
         submitLabel="שמירת לקוח"
         cancelHref={CLIENTS_PATH}
       />

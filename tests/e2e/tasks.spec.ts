@@ -11,6 +11,7 @@ import {
   expectNavCurrent,
   hasHorizontalScroll,
   trackCspViolations,
+  isAppConsoleProblem,
 } from "./support/helpers";
 
 /**
@@ -641,7 +642,7 @@ test_.describe("M6-12: export carry-overs", () => {
     async ({ page }) => {
       const messages: string[] = [];
       page.on("console", (message) => {
-        if (message.type() === "warning" || message.type() === "error") {
+        if (isAppConsoleProblem(message.type(), message.text())) {
           messages.push(message.text());
         }
       });

@@ -92,6 +92,9 @@ export async function getExpense(supabase: SupabaseClient, id: string): Promise<
 export type ExpenseRefusal =
   "date_in_future" | "category_archived" | "category_missing" | "file_missing";
 
+/** M7.1-9: the file was recorded by another expense (only a tampered form gets here). */
+const FILE_OF_ANOTHER_EXPENSE = "HKE04";
+
 const REFUSALS: Record<string, ExpenseRefusal> = {
   [DATE_IN_FUTURE]: "date_in_future",
   [CATEGORY_ARCHIVED]: "category_archived",
@@ -99,11 +102,15 @@ const REFUSALS: Record<string, ExpenseRefusal> = {
   [FILE_MISSING]: "file_missing",
   // The path is another expense's file: only a tampered form gets here.
   [UNIQUE_VIOLATION]: "file_missing",
+  [FILE_OF_ANOTHER_EXPENSE]: "file_missing",
 };
 
 export type SaveExpenseResult =
-  /** hasFile: the saved expense has a file (EXP-7). */
-  | { status: "saved"; hasFile: boolean }
+  /**
+   * hasFile: the saved expense has a file (EXP-7). duplicate (M7.1-8): an earlier request
+   * with the same create key already created the expense; this request recorded nothing.
+   */
+  | { status: "saved"; hasFile: boolean; duplicate?: true }
   | { status: "not_found" }
   | { status: "refused"; refusal: ExpenseRefusal };
 
@@ -115,16 +122,46 @@ function refusedOrThrow(error: { code?: string }, message: string): SaveExpenseR
   throw new Error(message, { cause: error });
 }
 
-/** EXP-1: records a new expense, with the path of its checked file or without one. */
+/**
+ * EXP-1: records a new expense, with the path of its checked file or without one. M7.1-8: a
+ * repeated create key leaves the expense that key created as it is.
+ */
 export async function insertExpense(
   supabase: SupabaseClient,
   input: ExpenseInput,
   filePath: string | null,
+  createKey: string | null = null,
 ): Promise<SaveExpenseResult> {
-  const { error } = await supabase.from(TABLE).insert({ ...input, file_path: filePath });
-  return error
-    ? refusedOrThrow(error, "Could not save the expense")
-    : { status: "saved", hasFile: filePath !== null };
+  const { error } = await supabase
+    .from(TABLE)
+    .insert({ ...input, file_path: filePath, create_key: createKey });
+  if (!error) {
+    return { status: "saved", hasFile: filePath !== null };
+  }
+  // A repeated create (M7.1-8) can hit the file's unique constraint before the key's, so any
+  // unique violation with a key is checked against the key.
+  if (createKey !== null && error.code === UNIQUE_VIOLATION) {
+    const { data, error: readError } = await supabase
+      .from(TABLE)
+      .select("file_path")
+      .eq("create_key", createKey)
+      .maybeSingle<{ file_path: string | null }>();
+    if (readError) {
+      throw new Error("Could not read the expense of a repeated create key", {
+        cause: readError,
+      });
+    }
+    if (data === null) {
+      // No expense has this key: the violation was the file's (another expense's file).
+      return refusedOrThrow(error, "Could not save the expense");
+    }
+    const hasFile = data.file_path !== null;
+    // The same upload sent again is the one the expense recorded; anything else was not.
+    return data.file_path === filePath
+      ? { status: "saved", hasFile }
+      : { status: "saved", hasFile, duplicate: true };
+  }
+  return refusedOrThrow(error, "Could not save the expense");
 }
 
 /**

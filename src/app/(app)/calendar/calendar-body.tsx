@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ToggleAnnouncement, useTaskDoneToggles } from "@/components/task-done";
 import { TaskRow } from "@/components/task-row";
@@ -16,7 +16,7 @@ import {
   type CalendarParams,
   type CalendarRange,
 } from "@/lib/tasks/calendar";
-import { TASKS_PATH } from "@/lib/tasks/paths";
+import { TASKS_PATH, calendarReturnTarget, type TaskReturnTarget } from "@/lib/tasks/paths";
 import { CALENDAR_TASKS_LIMIT, type TaskListItem } from "@/lib/tasks/queries";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +34,13 @@ type Toggles = ReturnType<typeof useTaskDoneToggles>;
 
 /** Titles shown in a month cell from the md breakpoint; the rest are counted. */
 const MONTH_CELL_TITLES = 3;
+
+/**
+ * M7.1-11: the month day the user just chose. Choosing a day loads the month view again (a
+ * new address), so focus would fall back to the page; the new view moves it to that day's
+ * link. Module state survives the client-side navigation; null once used.
+ */
+let monthDayToFocus: string | null = null;
 
 function tasksCountText(count: number): string {
   if (count === 0) {
@@ -72,6 +79,8 @@ export function CalendarBody({
   const [shown] = useState(tasks);
   const toggles = useTaskDoneToggles();
   const byDate = groupByDate(shown);
+  // M7.1-12: a task's edit form returns to this view and date.
+  const from = calendarReturnTarget(params);
 
   return (
     <div className="space-y-4">
@@ -86,7 +95,7 @@ export function CalendarBody({
         </p>
       ) : null}
       {params.view === "agenda" ? (
-        <AgendaView range={range} today={today} byDate={byDate} toggles={toggles} />
+        <AgendaView range={range} today={today} byDate={byDate} toggles={toggles} from={from} />
       ) : null}
       {params.view === "day" ? (
         <DaySection
@@ -94,15 +103,23 @@ export function CalendarBody({
           today={today}
           tasks={byDate.get(params.date) ?? []}
           toggles={toggles}
+          from={from}
           headingLevel="h3"
           emptyText="אין משימות פתוחות עם דדליין ביום הזה."
         />
       ) : null}
       {params.view === "week" ? (
-        <WeekView range={range} today={today} byDate={byDate} toggles={toggles} />
+        <WeekView range={range} today={today} byDate={byDate} toggles={toggles} from={from} />
       ) : null}
       {params.view === "month" ? (
-        <MonthView params={params} range={range} today={today} byDate={byDate} toggles={toggles} />
+        <MonthView
+          params={params}
+          range={range}
+          today={today}
+          byDate={byDate}
+          toggles={toggles}
+          from={from}
+        />
       ) : null}
       {hasMore ? (
         <p className="text-muted-foreground text-sm">
@@ -126,6 +143,7 @@ type DaySectionProps = {
   today: string;
   tasks: readonly TaskListItem[];
   toggles: Toggles;
+  from: TaskReturnTarget;
   headingLevel: "h3" | "h4";
   emptyText?: string;
   stacked?: boolean;
@@ -138,6 +156,7 @@ function DaySection({
   today,
   tasks,
   toggles,
+  from,
   headingLevel: Heading,
   emptyText,
   stacked,
@@ -174,6 +193,7 @@ function DaySection({
                 today={today}
                 pending={toggles.isPending(task.id)}
                 onToggle={() => toggles.toggle(task)}
+                from={from}
                 showDueDate={false}
                 stacked={stacked}
               />
@@ -190,10 +210,11 @@ type RangeViewProps = {
   today: string;
   byDate: Map<string, TaskListItem[]>;
   toggles: Toggles;
+  from: TaskReturnTarget;
 };
 
 /** CAL-1: the agenda: the days of the range that have tasks, in order (default on mobile). */
-function AgendaView({ range, today, byDate, toggles }: RangeViewProps) {
+function AgendaView({ range, today, byDate, toggles, from }: RangeViewProps) {
   const days = datesBetween(range.from, range.to).filter((date) => byDate.has(date));
   if (days.length === 0) {
     return (
@@ -211,6 +232,7 @@ function AgendaView({ range, today, byDate, toggles }: RangeViewProps) {
           today={today}
           tasks={byDate.get(date) ?? []}
           toggles={toggles}
+          from={from}
           headingLevel="h3"
         />
       ))}
@@ -219,7 +241,7 @@ function AgendaView({ range, today, byDate, toggles }: RangeViewProps) {
 }
 
 /** CAL-1: the week, Sunday to Saturday: a list on mobile, seven columns on desktop. */
-function WeekView({ range, today, byDate, toggles }: RangeViewProps) {
+function WeekView({ range, today, byDate, toggles, from }: RangeViewProps) {
   return (
     <div className="grid gap-4 md:grid-cols-7 md:gap-2">
       {datesBetween(range.from, range.to).map((date) => (
@@ -229,6 +251,7 @@ function WeekView({ range, today, byDate, toggles }: RangeViewProps) {
           today={today}
           tasks={byDate.get(date) ?? []}
           toggles={toggles}
+          from={from}
           headingLevel="h3"
           emptyText="אין משימות."
           stacked
@@ -254,6 +277,7 @@ function MonthView({
   today,
   byDate,
   toggles,
+  from,
 }: RangeViewProps & { params: CalendarParams }) {
   const dates = datesBetween(range.from, range.to);
   const weeks: string[][] = [];
@@ -261,9 +285,19 @@ function MonthView({
     weeks.push(dates.slice(start, start + 7));
   }
   const month = params.date.slice(0, 7);
+  const tableRef = useRef<HTMLTableElement>(null);
+  useEffect(() => {
+    if (monthDayToFocus !== params.date) {
+      return;
+    }
+    monthDayToFocus = null;
+    tableRef.current
+      ?.querySelector<HTMLAnchorElement>(`a[data-date="${params.date}"]`)
+      ?.focus({ preventScroll: true });
+  }, [params.date]);
   return (
     <div className="space-y-6">
-      <table className="w-full table-fixed border-collapse">
+      <table ref={tableRef} className="w-full table-fixed border-collapse">
         <caption className="sr-only">
           {monthLabel(params.date)}: מספר המשימות הפתוחות בכל יום. בחירת יום מציגה את המשימות שלו
           מתחת לטבלה.
@@ -300,6 +334,7 @@ function MonthView({
         today={today}
         tasks={byDate.get(params.date) ?? []}
         toggles={toggles}
+        from={from}
         headingLevel="h3"
         emptyText="אין משימות פתוחות עם דדליין ביום הזה."
         className="rounded-lg border p-4"
@@ -336,6 +371,12 @@ function MonthCell({
       {reachable ? (
         <Link
           href={calendarPath({ view: "month", date })}
+          // The table stays where it is: the view loads again without jumping to the top.
+          scroll={false}
+          data-date={date}
+          onClick={() => {
+            monthDayToFocus = date;
+          }}
           aria-current={isToday ? "date" : undefined}
           className={cn(
             "hover:bg-accent flex min-h-14 w-full flex-col items-stretch gap-0.5 p-1 text-sm md:min-h-24",

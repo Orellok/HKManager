@@ -72,6 +72,10 @@ export function buildContentSecurityPolicy({
     ["img-src", ["'self'", "blob:", "data:"]],
     ["font-src", ["'self'"]],
     ["connect-src", ["'self'", supabaseOrigin]],
+    // M7.1-4: the service worker (public/sw.js) and the manifest come from the app itself.
+    // Explicit, because 'strict-dynamic' makes browsers ignore 'self' in script-src.
+    ["worker-src", ["'self'"]],
+    ["manifest-src", ["'self'"]],
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", ["'self'"]],

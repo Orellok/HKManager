@@ -1,5 +1,10 @@
 import { clientPath } from "@/lib/clients/paths";
+import { isIsoDate, isIsoDateInRange } from "@/lib/dates";
 import { projectPath } from "@/lib/projects/paths";
+
+import { CALENDAR_PATH, calendarPath, isCalendarView, type CalendarParams } from "./calendar";
+
+export { CALENDAR_PATH };
 
 /** Routes of the tasks screens. Only ids and fixed codes go into a URL (SPEC 8). */
 
@@ -26,10 +31,41 @@ export const TASK_PROJECT_PARAM = "project";
 export const TASK_FROM_PARAM = "from";
 
 export const TASK_RETURN_TARGETS = ["tasks", "client", "project"] as const;
-export type TaskReturnTarget = (typeof TASK_RETURN_TARGETS)[number];
+/**
+ * Where a task form returns to: the list, the linked card, or (M7.1-12) the calendar view and
+ * date it was opened from, written as `calendar:<view>:<date>` (a code and a date only).
+ */
+export type TaskReturnTarget =
+  (typeof TASK_RETURN_TARGETS)[number] | `calendar:${CalendarParams["view"]}:${string}`;
+
+const CALENDAR_RETURN_PREFIX = "calendar";
+
+export function calendarReturnTarget({ view, date }: CalendarParams): TaskReturnTarget {
+  return `${CALENDAR_RETURN_PREFIX}:${view}:${date}`;
+}
+
+/** The calendar view and date of a `calendar:<view>:<date>` target, or null. */
+function calendarParamsOf(target: string): CalendarParams | null {
+  const [prefix, view, date, ...rest] = target.split(":");
+  if (
+    prefix !== CALENDAR_RETURN_PREFIX ||
+    rest.length > 0 ||
+    !isCalendarView(view) ||
+    date === undefined ||
+    !isIsoDate(date) ||
+    !isIsoDateInRange(date)
+  ) {
+    return null;
+  }
+  return { view, date };
+}
 
 export function taskReturnTargetFrom(param: unknown): TaskReturnTarget {
-  return param === "client" || param === "project" ? param : "tasks";
+  if (param === "client" || param === "project") {
+    return param;
+  }
+  const calendar = typeof param === "string" ? calendarParamsOf(param) : null;
+  return calendar ? calendarReturnTarget(calendar) : "tasks";
 }
 
 export function newClientTaskPath(clientId: string): string {
@@ -47,7 +83,7 @@ export function newProjectTaskPath(projectId: string): string {
 
 export function editTaskPath(id: string, from: TaskReturnTarget = "tasks"): string {
   const path = `${TASKS_PATH}/${encodeURIComponent(id)}/edit`;
-  return from === "tasks" ? path : `${path}?${TASK_FROM_PARAM}=${from}`;
+  return from === "tasks" ? path : `${path}?${new URLSearchParams({ [TASK_FROM_PARAM]: from })}`;
 }
 
 /** Where a saved or deleted task returns to: its client's or project's card, or the list. */
@@ -61,8 +97,6 @@ export function taskReturnPath(
   if (from === "project" && links.projectId !== null) {
     return projectPath(links.projectId);
   }
-  return TASKS_PATH;
+  const calendar = calendarParamsOf(from);
+  return calendar ? calendarPath(calendar) : TASKS_PATH;
 }
-
-/** CAL-11: the in-app calendar. */
-export const CALENDAR_PATH = "/calendar";

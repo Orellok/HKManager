@@ -90,8 +90,10 @@ export function buildPrelude(rowCounts: Record<string, number>, replace: boolean
       "end $$;",
     );
   }
-  if (tables.length > 0) {
-    lines.push(`truncate table ${tables.map(quoteTable).join(", ")};`);
+  // DELETE, not TRUNCATE: on a hosted project `postgres` may delete from auth tables but
+  // does not own them. With the replica role no trigger or foreign-key check fires.
+  for (const table of tables) {
+    lines.push(`delete from ${quoteTable(table)};`);
   }
   return `${lines.join("\n")}\n`;
 }

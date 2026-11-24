@@ -140,11 +140,38 @@ export async function runRestoreDrill(log: Log = console.log): Promise<void> {
       log,
     });
 
-    const after = await tableFingerprints(stack.dbUrl, tables);
-    const differing = tables.filter((table) => before[table] !== after[table]);
-    if (differing.length > 0) {
-      throw new BackupError(`Drill: tables differ after restore: ${differing.join(", ")}`);
+    const compare = async (stage: string) => {
+      const after = await tableFingerprints(stack.dbUrl, tables);
+      const differing = tables.filter((table) => before[table] !== after[table]);
+      if (differing.length > 0) {
+        throw new BackupError(`Drill: tables differ ${stage}: ${differing.join(", ")}`);
+      }
+    };
+    await compare("after restore");
+
+    // A second restore into a project that now holds data is refused, then --replace works.
+    const refused = await restoreArchive({
+      archivePath: archive.path,
+      dbUrl: stack.dbUrl,
+      storage,
+      replace: false,
+    }).then(
+      () => false,
+      (error: unknown) =>
+        error instanceof BackupError && error.message.includes("already holds data"),
+    );
+    if (!refused) {
+      throw new BackupError("Drill: a restore over existing data was not refused");
     }
+    log("Restore over existing data without --replace: refused, nothing changed");
+    await restoreArchive({
+      archivePath: archive.path,
+      dbUrl: stack.dbUrl,
+      storage,
+      replace: true,
+      log,
+    });
+    await compare("after --replace restore");
     const mismatched = await objectsMatch(storage, manifest, join(workDir, "after-restore"));
     if (mismatched > 0) {
       throw new BackupError(

@@ -76,7 +76,7 @@ describe("M7.3-10: restore checks", () => {
     expect(sql).not.toContain('exists (select 1 from "public"."app_settings")');
     expect(sql).toContain("errcode = 'HKR01'");
     expect(sql).toContain(
-      'truncate table "auth"."users", "public"."app_settings", "public"."clients";',
+      'delete from "auth"."users";\ndelete from "public"."app_settings";\ndelete from "public"."clients";',
     );
     expect(sql.startsWith("set session_replication_role = replica;")).toBe(true);
   });
@@ -84,7 +84,7 @@ describe("M7.3-10: restore checks", () => {
   it("M7.3-10: --replace skips the refusal but still empties the dumped tables first", () => {
     const sql = buildPrelude({ "public.clients": 3 }, true);
     expect(sql).not.toContain("HKR01");
-    expect(sql).toContain('truncate table "public"."clients";');
+    expect(sql).toContain('delete from "public"."clients";');
   });
 
   it("M7.3-10: the row-count check compares every table with the manifest", () => {

@@ -37,7 +37,7 @@ export function generateVapidKeys(): VapidKeyPair {
 export function renderEnvFile(keys: VapidKeyPair, subject: string): string {
   return [
     "# Web Push VAPID keys (M7.2). Secret: never commit, never paste into a chat.",
-    "# Load with: pnpm exec supabase secrets set --env-file <this file> --project-ref <ref>",
+    "# Load with: pnpm exec supabase secrets set --env-file <this file> --remote=<ref> --yes",
     `VAPID_PUBLIC_KEY=${keys.publicKey}`,
     `VAPID_PRIVATE_KEY=${keys.privateKey}`,
     `VAPID_SUBJECT=${subject}`,
@@ -71,7 +71,7 @@ function main(args: string[]): number {
   console.log(`Public key (not secret): ${keys.publicKey}`);
   console.log("");
   console.log("Next steps (docs/setup/push.md):");
-  console.log(`1. pnpm exec supabase secrets set --env-file ${file} --project-ref ${projectRef}`);
+  console.log(`1. pnpm exec supabase secrets set --env-file ${file} --remote=${projectRef} --yes`);
   console.log(
     `2. GitHub repository variable ${environment.toUpperCase()}_NEXT_PUBLIC_VAPID_PUBLIC_KEY = the public key above; then redeploy.`,
   );

@@ -13,6 +13,7 @@
 | `SUPABASE_ACCESS_TOKEN` | Personal access token של חשבון Supabase | סעיף 1 |
 | `SUPABASE_STAGING_DB_PASSWORD` | סיסמת מסד הנתונים של `hkmanager-staging` | סעיף 2 |
 | `SUPABASE_PROD_DB_PASSWORD` | סיסמת מסד הנתונים של `hkmanager-prod` | סעיף 2 |
+| `GOOGLE_DRIVE_BACKUP_CLIENT_ID` / `_CLIENT_SECRET` / `_REFRESH_TOKEN` | הגיבוי השבועי ל-Google Drive (M7.3) | `docs/setup/backups.md` |
 
 מזהי הפרויקטים (`tmistmqyqcnjftovxyoy` ל-staging, `gnjdyiujvxbwhxmldgfn` ל-production) אינם סודיים וכבר כתובים בקובצי ה-workflow.
 

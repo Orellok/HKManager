@@ -422,7 +422,7 @@ describe("M7.2-2: schedule and configuration", () => {
     const configured = await runPsqlSession(`
       begin;
       select public.configure_push_reminders('http://kong:8000/functions/v1/push');
-      select public.configure_push_reminders('https://abcdefgh.supabase.co/functions/v1/push');
+      select public.configure_push_reminders('https://abcdefghijklmnopqrst.supabase.co/functions/v1/push');
       do $$
       declare request_id bigint;
       begin
@@ -430,7 +430,7 @@ describe("M7.2-2: schedule and configuration", () => {
         if not exists (
           select 1 from net.http_request_queue as q
           where q.id = request_id
-            and q.url = 'https://abcdefgh.supabase.co/functions/v1/push'
+            and q.url = 'https://abcdefghijklmnopqrst.supabase.co/functions/v1/push'
             and q.method = 'POST'
             and q.headers ? 'x-reminders-secret'
         ) then
@@ -444,6 +444,11 @@ describe("M7.2-2: schedule and configuration", () => {
   it("M7.2-2: configure_push_reminders accepts only a push function URL", async () => {
     for (const url of [
       "https://evil.example/x",
+      // M7.3-12(d): only this project's Supabase function URL, not any host with that path.
+      "https://evil.example/functions/v1/push",
+      "https://abcdefgh.supabase.co/functions/v1/push",
+      "https://abcdefghijklmnopqrst.supabase.co.evil.example/functions/v1/push",
+      "https://abcdefghijklmnopqrst.example.co/functions/v1/push",
       "http://example.com/functions/v1/push",
       "javascript:alert(1)",
     ]) {

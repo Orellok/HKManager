@@ -1,0 +1,104 @@
+name: Weekly backup
+
+# M7.3 (SPEC 8): database dump + every Storage object → one archive → the app's own folder in
+# the owner's Google Drive (OAuth refresh token, scope drive.file), verified, newest 12 kept per
+# environment. Not encrypted (SPEC 8, owner decision). docs/setup/backups.md,
+# docs/setup/restore.md.
+#
+# The repository is public: the script prints only outcomes, counts and sizes; there are no
+# artifacts or caches; work files live under $RUNNER_TEMP and are deleted. A failed run makes
+# GitHub email the admin. GitHub disables scheduled workflows after 60 days without repository
+# activity (docs/setup/backups.md).
+on:
+  schedule:
+    # Saturday at 02:41 UTC (production).
+    - cron: "41 2 * * 6"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to back up (staging holds no real data; use it to try the pipeline)"
+        type: choice
+        options:
+          - production
+          - staging
+        default: production
+
+run-name: Backup ${{ inputs.environment || 'production' }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-backup
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  backup:
+    name: Back up ${{ inputs.environment || 'production' }} to Google Drive
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BACKUP_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+      SUPABASE_PROJECT_REF: ${{ inputs.environment == 'staging' && 'tmistmqyqcnjftovxyoy' || 'gnjdyiujvxbwhxmldgfn' }}
+      BACKUP_WORK_DIR: ${{ runner.temp }}/hkmanager-backup
+    steps:
+      - name: Check that the secrets are set
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          DB_PASSWORD: ${{ inputs.environment == 'staging' && secrets.SUPABASE_STAGING_DB_PASSWORD || secrets.SUPABASE_PROD_DB_PASSWORD }}
+          DB_PASSWORD_NAME: ${{ inputs.environment == 'staging' && 'SUPABASE_STAGING_DB_PASSWORD' || 'SUPABASE_PROD_DB_PASSWORD' }}
+          GOOGLE_DRIVE_BACKUP_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_BACKUP_CLIENT_ID }}
+          GOOGLE_DRIVE_BACKUP_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_BACKUP_CLIENT_SECRET }}
+          GOOGLE_DRIVE_BACKUP_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_BACKUP_REFRESH_TOKEN }}
+        run: |
+          missing=0
+          for name in SUPABASE_ACCESS_TOKEN GOOGLE_DRIVE_BACKUP_CLIENT_ID \
+            GOOGLE_DRIVE_BACKUP_CLIENT_SECRET GOOGLE_DRIVE_BACKUP_REFRESH_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The $name secret is not set (docs/setup/backups.md)"
+              missing=1
+            fi
+          done
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "::error::The $DB_PASSWORD_NAME secret is not set (docs/setup/github-secrets.md)"
+            missing=1
+          fi
+          exit "$missing"
+
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The Supabase CLI (pg_dump of the server's version, in Docker) is a pinned devDependency.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      # Node >= 22.18 runs the .mts scripts directly; "22" resolves to the latest 22.x.
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Back up
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ inputs.environment == 'staging' && secrets.SUPABASE_STAGING_DB_PASSWORD || secrets.SUPABASE_PROD_DB_PASSWORD }}
+          GOOGLE_DRIVE_BACKUP_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_BACKUP_CLIENT_ID }}
+          GOOGLE_DRIVE_BACKUP_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_BACKUP_CLIENT_SECRET }}
+          GOOGLE_DRIVE_BACKUP_REFRESH_TOKEN: ${{ secrets.GOOGLE_DRIVE_BACKUP_REFRESH_TOKEN }}
+        run: node scripts/backup/backup.mts
+
+      # The script deletes its files itself; this also covers a run that was cancelled or timed
+      # out mid-way. Nothing is ever written into the repository checkout.
+      - name: Delete the work files
+        if: always()
+        run: rm -rf "$BACKUP_WORK_DIR"

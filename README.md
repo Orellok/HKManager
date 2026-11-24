@@ -4,7 +4,7 @@
 
 The local stack runs in Docker through the Supabase CLI, which is a devDependency.
 
-Requirements: Node 22, pnpm 10 and a running Docker daemon.
+Requirements: Node 22 (>= 22.18, which runs the `.mts` scripts in `scripts/` directly), pnpm 10 and a running Docker daemon.
 
 ```bash
 pnpm install

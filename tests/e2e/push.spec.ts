@@ -371,6 +371,8 @@ test_.describe("M7.2-8: the install suggestion", () => {
         .poll(() => page.evaluate(() => (window as unknown as { __prompted?: boolean }).__prompted))
         .toBe(true);
       await expect(install).toHaveCount(0);
+      // M7.3-12(b): focus does not fall to the page when the used offer's button goes away.
+      await expect(section(page).getByRole("heading", { name: "התקנת האפליקציה" })).toBeFocused();
     },
   );
 

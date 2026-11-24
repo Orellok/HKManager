@@ -67,6 +67,7 @@ export function PushSettings({ vapidPublicKey }: { vapidPublicKey: string | null
   const [message, setMessage] = useState<Message>(null);
   const inFlight = useRef(false);
   const statusRef = useRef<HTMLParagraphElement>(null);
+  const installHeadingRef = useRef<HTMLHeadingElement>(null);
   const canInstall = useSyncExternalStore(subscribeInstallPrompt, canPromptInstall, () => false);
   // The server render assumes installed, so the suggestion appears only once the browser says.
   const installed = useSyncExternalStore(subscribeStandalone, isInstalledApp, () => true);
@@ -215,6 +216,8 @@ export function PushSettings({ vapidPublicKey }: { vapidPublicKey: string | null
   const install = () =>
     run("install", async () => {
       await promptInstall();
+      // The offer can be used once, so the button is gone; focus stays in the suggestion.
+      installHeadingRef.current?.focus();
     });
 
   const state = device.state;
@@ -279,7 +282,13 @@ export function PushSettings({ vapidPublicKey }: { vapidPublicKey: string | null
       </div>
       {!installed && state !== "checking" && state !== "unsupported" ? (
         <div className="space-y-2">
-          <h3 className="font-semibold">{INSTALL_HEADING}</h3>
+          <h3
+            ref={installHeadingRef}
+            tabIndex={-1}
+            className="font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {INSTALL_HEADING}
+          </h3>
           <p className="text-sm">{INSTALL_TEXT}</p>
           {canInstall ? (
             <Button variant="secondary" pending={running === "install"} onClick={install}>

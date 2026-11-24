@@ -8,6 +8,6 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mts"],
+    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mts", "supabase/functions/**/*.test.ts"],
   },
 });

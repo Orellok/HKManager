@@ -161,7 +161,12 @@ export async function encryptPayload(
   );
   const keyInfo = concat(textEncoder.encode("WebPush: info\0"), receiverPoint, sender.publicPoint);
   const ikm = await hkdf(ecdhSecret, authSecret, keyInfo, 256);
-  const contentKey = await hkdf(ikm, salt, textEncoder.encode("Content-Encoding: aes128gcm\0"), 128);
+  const contentKey = await hkdf(
+    ikm,
+    salt,
+    textEncoder.encode("Content-Encoding: aes128gcm\0"),
+    128,
+  );
   const nonce = await hkdf(ikm, salt, textEncoder.encode("Content-Encoding: nonce\0"), 96);
   const aesKey = await crypto.subtle.importKey("raw", contentKey, "AES-GCM", false, ["encrypt"]);
   // 0x02: the last (and only) record, no padding.

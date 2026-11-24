@@ -46,7 +46,12 @@ async function hkdf(ikm: Uint8Array, salt: Uint8Array, info: string | Uint8Array
   const infoBytes = typeof info === "string" ? encoder.encode(info) : info;
   return new Uint8Array(
     await crypto.subtle.deriveBits(
-      { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(salt), info: new Uint8Array(infoBytes) },
+      {
+        name: "HKDF",
+        hash: "SHA-256",
+        salt: new Uint8Array(salt),
+        info: new Uint8Array(infoBytes),
+      },
       key,
       bits,
     ),
@@ -71,7 +76,11 @@ async function decrypt(body: Uint8Array, receiver: CryptoKeyPair, auth: Uint8Arr
   const secret = new Uint8Array(
     await crypto.subtle.deriveBits({ name: "ECDH", public: senderKey }, receiver.privateKey, 256),
   );
-  const info = new Uint8Array([...encoder.encode("WebPush: info\0"), ...receiverPoint, ...senderPoint]);
+  const info = new Uint8Array([
+    ...encoder.encode("WebPush: info\0"),
+    ...receiverPoint,
+    ...senderPoint,
+  ]);
   const ikm = await hkdf(secret, auth, info, 256);
   const cek = await hkdf(ikm, salt, "Content-Encoding: aes128gcm\0", 128);
   const nonce = await hkdf(ikm, salt, "Content-Encoding: nonce\0", 96);
@@ -79,7 +88,12 @@ async function decrypt(body: Uint8Array, receiver: CryptoKeyPair, auth: Uint8Arr
   const plain = new Uint8Array(
     await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, key, new Uint8Array(record)),
   );
-  return { recordSize, keyLength, delimiter: plain[plain.length - 1], text: new TextDecoder().decode(plain.subarray(0, -1)) };
+  return {
+    recordSize,
+    keyLength,
+    delimiter: plain[plain.length - 1],
+    text: new TextDecoder().decode(plain.subarray(0, -1)),
+  };
 }
 
 async function receiverKeys() {
@@ -114,8 +128,12 @@ describe("M7.2-5: RFC 8291 message encryption", () => {
     const { target } = await receiverKeys();
     const first = await encryptPayload(target, encoder.encode("x"));
     const second = await encryptPayload(target, encoder.encode("x"));
-    expect(base64UrlEncode(first.subarray(0, 16))).not.toBe(base64UrlEncode(second.subarray(0, 16)));
-    expect(base64UrlEncode(first.subarray(21, 86))).not.toBe(base64UrlEncode(second.subarray(21, 86)));
+    expect(base64UrlEncode(first.subarray(0, 16))).not.toBe(
+      base64UrlEncode(second.subarray(0, 16)),
+    );
+    expect(base64UrlEncode(first.subarray(21, 86))).not.toBe(
+      base64UrlEncode(second.subarray(21, 86)),
+    );
   });
 
   it("M7.2-5: rejects malformed subscription keys and oversized payloads", async () => {
@@ -207,7 +225,12 @@ describe("M7.2-5: sending", () => {
     const gone = vi.fn(async () => new Response("gone", { status: 410 }));
     const options = { ttlSeconds: 60, urgency: "high" as const, fetchImpl: gone };
     expect(
-      await sendWebPush({ ...target, endpoint: "https://fcm.googleapis.com/x" }, "{}", vapid, options),
+      await sendWebPush(
+        { ...target, endpoint: "https://fcm.googleapis.com/x" },
+        "{}",
+        vapid,
+        options,
+      ),
     ).toBe(410);
     await expect(
       sendWebPush({ ...target, endpoint: "http://fcm.googleapis.com/x" }, "{}", vapid, options),
